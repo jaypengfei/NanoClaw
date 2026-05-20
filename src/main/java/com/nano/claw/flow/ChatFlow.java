@@ -285,11 +285,8 @@ public class ChatFlow {
         // 异步处理，先回复收到
         ChatResponse response = chat(chatRequest);
 
-        // 通过飞书通道回复
-        if (response.isSuccess()) {
-            feishuChannel.reply(channelMsg.getMsgId(), response.getAnswer());
-        }
-
+        // 通过 ChatFlow.chat() 内部已自动通过 channel 回复，此处不再重复调用
+        // chat() 方法会检查 request.getChannel() 并自动调用 channel.sendText()
         return response;
     }
 
