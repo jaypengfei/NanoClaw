@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoClaw Agent</title>
+    <!-- Markdown 渲染 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --bg-deep: #0a0e17;
+            --bg-panel: #0f1523;
+            --bg-card: #141c2e;
+            --bg-input: #1a2340;
+            --border: #1e2d4a;
+            --border-glow: #3b82f6;
+            --text-primary: #e2e8f0;
+            --text-secondary: #8892a8;
+            --text-muted: #4a5568;
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-pink: #ec4899;
+            --accent-amber: #f59e0b;
+            --gradient-main: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-cyan: linear-gradient(135deg, #06b6d4, #3b82f6);
+            --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ===== 背景动效 ===== */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow {
+            position: fixed;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.07;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow-1 {
+            top: -150px;
+            right: -100px;
+            background: var(--accent-blue);
+        }
+
+        .bg-glow-2 {
+            bottom: -200px;
+            left: -100px;
+            background: var(--accent-purple);
+        }
+
+        /* ===== 顶部栏 ===== */
+        .header {
+            position: relative;
+            z-index: 10;
+            background: rgba(15, 21, 35, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--gradient-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 0 16px rgba(139,92,246,0.3);
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.5px;
+        }
+
+        .header-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 1px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            font-size: 12px;
+            color: var(--accent-green);
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .btn-icon {
+            padding: 7px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-icon:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.08);
+        }
+
+        /* ===== 模式展示栏 ===== */
+        .mode-bar {
+            position: relative;
+            z-index: 10;
+            background: rgba(15, 21, 35, 0.6);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 28px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .mode-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mode-badge {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            animation: modeAppear 0.5s ease;
+        }
+
+        @keyframes modeAppear {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .mode-badge.visible { display: inline-flex; }
+
+        .mode-badge.react {
+            background: rgba(6, 182, 212, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+        }
+
+        .mode-badge.plan_and_execute {
+            background: rgba(139, 92, 246, 0.12);
+            color: var(--accent-purple);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .mode-badge.reflection {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .mode-badge.chat {
+            background: rgba(59, 130, 246, 0.12);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .mode-badge.cronjob {
+            background: rgba(245, 158, 11, 0.12);
+            color: var(--accent-amber);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .mode-badge .mode-icon { font-size: 13px; }
+
+        .session-tag {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ===== 聊天区域 ===== */
+        .chat-container {
+            position: relative;
+            z-index: 5;
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        .chat-container::-webkit-scrollbar { width: 5px; }
+        .chat-container::-webkit-scrollbar-track { background: transparent; }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        /* ===== 欢迎页 ===== */
+        .welcome {
+            text-align: center;
+            padding: 80px 20px 40px;
+            animation: fadeInUp 0.6s ease;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .welcome-orb {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            background: var(--gradient-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 0 40px rgba(139,92,246,0.25), 0 0 80px rgba(59,130,246,0.1);
+            animation: orb-float 4s ease-in-out infinite;
+        }
+
+        @keyframes orb-float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .welcome h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: var(--gradient-cyan);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            max-width: 440px;
+            margin: 0 auto;
+        }
+
+        .welcome .hint-tags {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .hint-tag {
+            padding: 7px 16px;
+            border-radius: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .hint-tag:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-cyan);
+            background: rgba(59, 130, 246, 0.06);
+        }
+
+        /* ===== 消息 ===== */
+        .message {
+            display: flex;
+            gap: 12px;
+            max-width: 78%;
+            animation: msgIn 0.35s ease;
+        }
+
+        @keyframes msgIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user { align-self: flex-end; flex-direction: row-reverse; }
+        .message.assistant { align-self: flex-start; }
+
+        .msg-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .message.user .msg-avatar {
+            background: var(--gradient-main);
+            box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
+        }
+
+        .message.assistant .msg-avatar {
+            background: var(--gradient-cyan);
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+        }
+
+        .msg-body { display: flex; flex-direction: column; gap: 4px; }
+
+        .msg-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .message.user .msg-meta { justify-content: flex-end; }
+
+        .msg-mode-tag {
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .msg-mode-tag.react {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--accent-cyan);
+        }
+
+        .msg-mode-tag.plan_and_execute {
+            background: rgba(139, 92, 246, 0.1);
+            color: var(--accent-purple);
+        }
+
+        .msg-mode-tag.reflection {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-amber);
+        }
+
+        .msg-mode-tag.chat {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-blue);
+        }
+
+        .msg-mode-tag.cronjob {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-amber);
+        }
+
+        .msg-bubble {
+            padding: 11px 16px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.65;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+
+        .message.user .msg-bubble {
+            background: var(--gradient-main);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .msg-bubble {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg-bubble.error {
+            background: rgba(239, 68, 68, 0.08) !important;
+            border: 1px solid rgba(239, 68, 68, 0.3) !important;
+            color: #f87171 !important;
+        }
+
+        /* ===== Markdown 渲染样式 ===== */
+        .msg-bubble.md-render {
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .msg-bubble.md-render p { margin: 0 0 10px; line-height: 1.7; }
+        .msg-bubble.md-render p:last-child { margin-bottom: 0; }
+
+        .msg-bubble.md-render h1, .msg-bubble.md-render h2, .msg-bubble.md-render h3,
+        .msg-bubble.md-render h4, .msg-bubble.md-render h5, .msg-bubble.md-render h6 {
+            margin: 16px 0 8px;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1.4;
+        }
+        .msg-bubble.md-render h1 { font-size: 20px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+        .msg-bubble.md-render h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+        .msg-bubble.md-render h3 { font-size: 15px; }
+
+        .msg-bubble.md-render ul, .msg-bubble.md-render ol {
+            margin: 6px 0;
+            padding-left: 22px;
+        }
+        .msg-bubble.md-render li { margin: 3px 0; line-height: 1.65; }
+
+        .msg-bubble.md-render blockquote {
+            margin: 8px 0;
+            padding: 6px 14px;
+            border-left: 3px solid var(--accent-blue);
+            background: rgba(59, 130, 246, 0.06);
+            color: var(--text-secondary);
+            border-radius: 0 6px 6px 0;
+        }
+        .msg-bubble.md-render blockquote p { margin: 2px 0; }
+
+        .msg-bubble.md-render code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-cyan);
+            padding: 1.5px 6px;
+            border-radius: 4px;
+        }
+
+        .msg-bubble.md-render pre {
+            margin: 10px 0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .msg-bubble.md-render pre code {
+            display: block;
+            padding: 14px 16px;
+            background: #0d1117 !important;
+            color: #c9d1d9;
+            font-size: 12.5px;
+            line-height: 1.55;
+            overflow-x: auto;
+            border-radius: 0;
+        }
+
+        .msg-bubble.md-render pre .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 12px;
+            background: rgba(30, 45, 74, 0.6);
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+        }
+
+        .msg-bubble.md-render pre .code-header .copy-btn {
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.2s;
+        }
+        .msg-bubble.md-render pre .code-header .copy-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.08);
+        }
+        .msg-bubble.md-render pre .code-header .copy-btn.copied {
+            color: var(--accent-green);
+            border-color: var(--accent-green);
+        }
+
+        .msg-bubble.md-render table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+        .msg-bubble.md-render th, .msg-bubble.md-render td {
+            padding: 7px 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        .msg-bubble.md-render th {
+            background: rgba(59, 130, 246, 0.08);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .msg-bubble.md-render td {
+            color: var(--text-secondary);
+        }
+        .msg-bubble.md-render tr:hover td {
+            background: rgba(59, 130, 246, 0.04);
+        }
+
+        .msg-bubble.md-render hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 14px 0;
+        }
+
+        .msg-bubble.md-render a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(6, 182, 212, 0.3);
+        }
+        .msg-bubble.md-render a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .msg-bubble.md-render img {
+            max-width: 100%;
+            border-radius: 8px;
+        }
+
+        .msg-bubble.md-render input[type="checkbox"] {
+            margin-right: 6px;
+        }
+
+        /* ===== 思考过程面板 ===== */
+        .think-panel {
+            margin-top: 6px;
+            border-radius: 10px;
+            background: rgba(10, 14, 23, 0.6);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            animation: msgIn 0.3s ease;
+        }
+
+        .think-toggle {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 12px;
+            cursor: pointer;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            user-select: none;
+            transition: color 0.2s;
+        }
+
+        .think-toggle:hover { color: var(--text-secondary); }
+
+        .think-toggle .toggle-arrow {
+            transition: transform 0.25s ease;
+            font-size: 9px;
+        }
+
+        .think-toggle.open .toggle-arrow { transform: rotate(90deg); }
+
+        .think-steps {
+            display: none;
+            padding: 4px 10px 10px;
+            border-top: 1px solid var(--border);
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .think-steps.visible { display: flex; }
+
+        .think-step {
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .step-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .step-icon.routing   { background: rgba(139,92,246,0.15); }
+        .step-icon.thought   { background: rgba(59,130,246,0.15); }
+        .step-icon.action    { background: rgba(245,158,11,0.15); }
+        .step-icon.observation { background: rgba(16,185,129,0.15); }
+        .step-icon.planning  { background: rgba(236,72,153,0.15); }
+        .step-icon.executing { background: rgba(245,158,11,0.15); }
+        .step-icon.reflecting { background: rgba(6,182,212,0.15); }
+        .step-icon.refining  { background: rgba(59,130,246,0.15); }
+        .step-icon.summary   { background: rgba(16,185,129,0.15); }
+
+        .step-body { flex: 1; min-width: 0; }
+
+        .step-title {
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 2px;
+        }
+
+        .step-title.routing    { color: var(--accent-purple); }
+        .step-title.thought    { color: var(--accent-blue); }
+        .step-title.action     { color: var(--accent-amber); }
+        .step-title.observation { color: var(--accent-green); }
+        .step-title.planning   { color: var(--accent-pink); }
+        .step-title.executing  { color: var(--accent-amber); }
+        .step-title.reflecting { color: var(--accent-cyan); }
+        .step-title.refining   { color: var(--accent-blue); }
+        .step-title.summary    { color: var(--accent-green); }
+
+        .step-content {
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .step-content::-webkit-scrollbar { width: 3px; }
+        .step-content::-webkit-scrollbar-thumb { background: var(--border); }
+
+        /* ===== 统计信息条 ===== */
+        .msg-stats {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+        }
+
+        .msg-stats .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .msg-stats .stat-item .stat-icon {
+            font-size: 11px;
+        }
+
+        .msg-stats .stat-item .stat-value {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .msg-stats .cached-tag {
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            font-size: 10px;
+            font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            padding: 6px 0;
+        }
+
+        .typing-indicator span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            animation: typing-bounce 1.4s ease-in-out infinite;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.15s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.3s; }
+
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+            30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        /* ===== 路由动画 ===== */
+        .routing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            background: rgba(139, 92, 246, 0.08);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            font-size: 12px;
+            color: var(--accent-purple);
+            font-family: 'JetBrains Mono', monospace;
+            animation: routing-pulse 1.5s ease-in-out infinite;
+            width: fit-content;
+        }
+
+        @keyframes routing-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .routing-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ===== 输入区域 ===== */
+        .input-area {
+            position: relative;
+            z-index: 10;
+            background: rgba(15, 21, 35, 0.85);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+            border-radius: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .input-wrapper textarea {
+            width: 100%;
+            padding: 11px 16px;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            resize: none;
+            outline: none;
+            max-height: 120px;
+            min-height: 44px;
+            line-height: 1.5;
+        }
+
+        .input-wrapper textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        .input-wrapper textarea:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-send {
+            padding: 11px 26px;
+            border: none;
+            border-radius: 14px;
+            background: var(--gradient-main);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+            font-family: inherit;
+            box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+        }
+
+        .btn-send:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(139, 92, 246, 0.4);
+        }
+
+        .btn-send:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-send .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 640px) {
+            .header { padding: 10px 16px; }
+            .header-title { font-size: 15px; }
+            .mode-bar { padding: 8px 16px; flex-wrap: wrap; }
+            .chat-container { padding: 16px; }
+            .input-area { padding: 12px 16px; }
+            .message { max-width: 92%; }
+            .welcome .hint-tags { gap: 6px; }
+            .hint-tag { font-size: 12px; padding: 5px 12px; }
+            .cronjob-panel { width: 100%; position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 100; }
+        }
+
+        /* ===== 定时任务侧边栏 ===== */
+        .main-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .cronjob-panel {
+            width: 380px;
+            background: rgba(15, 21, 35, 0.95);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .cronjob-panel.collapsed {
+            width: 0;
+            border-left: none;
+            opacity: 0;
+        }
+
+        .cronjob-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .cronjob-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cronjob-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--accent-amber);
+        }
+
+        .cronjob-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .cronjob-header .job-count {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .cronjob-close-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .cronjob-close-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .cronjob-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .cronjob-list::-webkit-scrollbar { width: 4px; }
+        .cronjob-list::-webkit-scrollbar-track { background: transparent; }
+        .cronjob-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .cronjob-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .cronjob-empty-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            opacity: 0.4;
+        }
+
+        .cronjob-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .cronjob-card:hover {
+            border-color: rgba(245, 158, 11, 0.3);
+            box-shadow: 0 2px 12px rgba(245, 158, 11, 0.06);
+        }
+
+        .cronjob-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .cronjob-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .cronjob-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .cronjob-status-dot.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+
+        .cronjob-status-dot.paused {
+            background: var(--accent-amber);
+        }
+
+        .cronjob-status-dot.error {
+            background: #ef4444;
+        }
+
+        .cronjob-card-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .cronjob-action-btn {
+            padding: 3px 8px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .cronjob-action-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .cronjob-action-btn.danger:hover {
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .cronjob-card-body {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .cronjob-card-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .cronjob-card-row .label {
+            color: var(--text-muted);
+            min-width: 48px;
+        }
+
+        .cronjob-card-row .value {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+
+        .cronjob-card-detail {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+            display: none;
+        }
+
+        .cronjob-card-detail.visible {
+            display: block;
+        }
+
+        .cronjob-card-detail .detail-section {
+            margin-bottom: 8px;
+        }
+
+        .cronjob-card-detail .detail-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cronjob-card-detail .history-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 4px 0;
+            font-size: 11px;
+            border-bottom: 1px solid rgba(30, 45, 74, 0.3);
+        }
+
+        .cronjob-card-detail .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .cronjob-card-detail .history-time {
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            white-space: nowrap;
+            min-width: 70px;
+        }
+
+        .cronjob-card-detail .history-result {
+            color: var(--text-secondary);
+            word-break: break-all;
+            max-height: 40px;
+            overflow: hidden;
+        }
+
+        .cronjob-card-detail .history-result.fail {
+            color: #f87171;
+        }
+
+        /* ===== 记忆面板 ===== */
+        .memory-panel {
+            width: 380px;
+            background: rgba(15, 21, 35, 0.95);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .memory-panel.collapsed {
+            width: 0;
+            border-left: none;
+            opacity: 0;
+        }
+
+        .memory-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .memory-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .memory-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(139, 92, 246, 0.12);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--accent-purple);
+        }
+
+        .memory-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .memory-header .mem-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .memory-close-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .memory-close-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .memory-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 12px;
+        }
+
+        .memory-tab {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .memory-tab:hover { color: var(--text-secondary); }
+        .memory-tab.active { color: var(--accent-purple); border-bottom-color: var(--accent-purple); }
+
+        .memory-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .memory-content::-webkit-scrollbar { width: 4px; }
+        .memory-content::-webkit-scrollbar-track { background: transparent; }
+        .memory-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .memory-section { margin-bottom: 20px; }
+
+        .memory-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 6px 12px;
+            font-size: 12px;
+        }
+
+        .profile-grid .pk {
+            color: var(--accent-purple);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .profile-grid .pv {
+            color: var(--text-secondary);
+        }
+
+        .profile-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .profile-tag {
+            padding: 3px 10px;
+            border-radius: 12px;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: var(--accent-purple);
+            font-size: 11px;
+        }
+
+        .profile-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .profile-list li {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 3px 0;
+            line-height: 1.5;
+        }
+
+        .profile-list li::before {
+            content: '·';
+            color: var(--accent-purple);
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .memory-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .memory-text::-webkit-scrollbar { width: 3px; }
+        .memory-text::-webkit-scrollbar-thumb { background: var(--border); }
+
+        .memory-stat {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .memory-stat-item {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            flex: 1;
+            text-align: center;
+        }
+
+        .memory-stat-item .num {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-purple);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .memory-stat-item .lbl {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .memory-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .memory-action-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .memory-action-btn:hover {
+            color: var(--accent-purple);
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.06);
+        }
+
+        .memory-empty {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .memory-empty-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            opacity: 0.4;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 背景层 -->
+<div class="bg-grid"></div>
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+
+<!-- 顶部栏 -->
+<div class="header">
+    <div class="header-left">
+        <div class="logo-icon">⚡</div>
+        <div>
+            <div class="header-title">NanoClaw Agent</div>
+            <div class="header-sub">AI-Powered Intelligent Routing</div>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="status-badge">
+            <span class="status-dot"></span>
+            <span>Online</span>
+        </div>
+        <button class="btn-icon" id="btnCronJob">⏰ 定时任务</button>
+        <button class="btn-icon" id="btnMemory">🧠 记忆</button>
+        <button class="btn-icon" id="btnReset">↻ 重置</button>
+    </div>
+</div>
+
+<!-- 模式展示栏 -->
+<div class="mode-bar">
+    <span class="mode-label">Mode</span>
+    <span class="mode-badge" id="modeBadge">
+        <span class="mode-icon" id="modeIcon"></span>
+        <span id="modeText"></span>
+    </span>
+    <span class="session-tag" id="sessionTag">ready</span>
+</div>
+
+<!-- 主体布局 -->
+<div class="main-layout">
+
+<!-- 聊天区域 -->
+<div style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+
+<!-- 聊天内容 -->
+<div class="chat-container" id="chatContainer">
+    <div class="welcome" id="welcome">
+        <div class="welcome-orb">⚡</div>
+        <h2>Hi, 我是 NanoClaw</h2>
+        <p>我会根据你的问题自动选择最合适的思考模式：<br>
+           <strong style="color:var(--accent-blue)">Chat</strong> 直接对话 ·
+           <strong style="color:var(--accent-cyan)">ReAct</strong> 实时推理 ·
+           <strong style="color:var(--accent-purple)">Plan</strong> 规划执行 ·
+           <strong style="color:var(--accent-amber)">Reflect</strong> 深度反思</p>
+        <div class="hint-tags">
+            <div class="hint-tag" data-q="今天北京天气怎么样？">天气查询</div>
+            <div class="hint-tag" data-q="帮我制定一个学习Java的30天计划">制定计划</div>
+            <div class="hint-tag" data-q="请写一首关于春天的现代诗">诗歌创作</div>
+            <div class="hint-tag" data-q="每天早上9点提醒我查看邮件">定时提醒</div>
+        </div>
+    </div>
+</div>
+
+<!-- 输入区域 -->
+<div class="input-area">
+    <div class="input-wrapper">
+        <textarea id="userInput" placeholder="输入问题，我将自动选择最佳模式... (Enter 发送)" rows="1"></textarea>
+    </div>
+    <button class="btn-send" id="btnSend">发送</button>
+</div>
+
+</div><!-- 聊天区域结束 -->
+
+<!-- 定时任务侧边栏 -->
+<div class="cronjob-panel collapsed" id="cronjobPanel">
+    <div class="cronjob-header">
+        <div class="cronjob-header-left">
+            <div class="cronjob-header-icon">⏰</div>
+            <div>
+                <h3>定时任务</h3>
+                <span class="job-count" id="jobCount">0 个任务</span>
+            </div>
+        </div>
+        <button class="cronjob-close-btn" id="btnCronClose">✕</button>
+    </div>
+    <div class="cronjob-list" id="cronjobList">
+        <div class="cronjob-empty" id="cronjobEmpty">
+            <div class="cronjob-empty-icon">⏰</div>
+            <p>暂无定时任务</p>
+            <p style="margin-top:6px;font-size:11px;">试试发送：每天早上9点提醒我查看邮件</p>
+        </div>
+    </div>
+</div>
+
+<!-- 记忆侧边栏 -->
+<div class="memory-panel collapsed" id="memoryPanel">
+    <div class="memory-header">
+        <div class="memory-header-left">
+            <div class="memory-header-icon">🧠</div>
+            <div>
+                <h3>记忆模块</h3>
+                <span class="mem-sub" id="memSub">持久化记忆 · 用户画像</span>
+            </div>
+        </div>
+        <button class="memory-close-btn" id="btnMemClose">✕</button>
+    </div>
+    <div class="memory-tabs">
+        <div class="memory-tab active" data-tab="profile">用户画像</div>
+        <div class="memory-tab" data-tab="global">长期记忆</div>
+        <div class="memory-tab" data-tab="daily">今日记忆</div>
+    </div>
+    <div class="memory-content" id="memoryContent">
+        <!-- 内容由 JS 动态渲染 -->
+    </div>
+</div>
+
+</div><!-- main-layout 结束 -->
+
+<script>
+    // ========== 状态 ==========
+    let sessionId = null;
+    let isLoading = false;
+    let lastMode = null;
+
+    // ========== Markdown 渲染配置 ==========
+
+    // 配置 marked (highlight.js 完整包已内置所有语言)
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+        highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                try { return hljs.highlight(code, { language: lang }).value; } catch(e) {}
+            }
+            try { return hljs.highlightAuto(code).value; } catch(e) {}
+            return code;
+        }
+    });
+
+    /** 渲染 Markdown 文本 */
+    function renderMarkdown(text) {
+        if (!text) return '';
+        try {
+            return marked.parse(text);
+        } catch(e) {
+            // 降级为纯文本
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    }
+
+    /** 给代码块添加语言标签 + 复制按钮 */
+    function addCopyButtons(container) {
+        container.querySelectorAll('pre').forEach(pre => {
+            const code = pre.querySelector('code');
+            if (!code) return;
+
+            // 提取语言
+            const langClass = Array.from(code.classList).find(c => c.startsWith('language-'));
+            const lang = langClass ? langClass.replace('language-', '') : '';
+
+            // 创建 code-header
+            const header = document.createElement('div');
+            header.className = 'code-header';
+
+            const langLabel = document.createElement('span');
+            langLabel.textContent = lang || 'code';
+            header.appendChild(langLabel);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = '复制';
+            copyBtn.addEventListener('click', function() {
+                const text = code.textContent || '';
+                navigator.clipboard.writeText(text).then(() => {
+                    copyBtn.textContent = '已复制';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.textContent = '复制';
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                }).catch(() => {
+                    // fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    copyBtn.textContent = '已复制';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        copyBtn.textContent = '复制';
+                        copyBtn.classList.remove('copied');
+                    }, 2000);
+                });
+            });
+            header.appendChild(copyBtn);
+
+            pre.insertBefore(header, code);
+        });
+    }
+
+    // ========== DOM ==========
+    const chatContainer = document.getElementById('chatContainer');
+    const welcome = document.getElementById('welcome');
+    const userInput = document.getElementById('userInput');
+    const btnSend = document.getElementById('btnSend');
+    const btnReset = document.getElementById('btnReset');
+    const modeBadge = document.getElementById('modeBadge');
+    const modeIcon = document.getElementById('modeIcon');
+    const modeText = document.getElementById('modeText');
+    const sessionTag = document.getElementById('sessionTag');
+
+    // ========== 工具函数 ==========
+
+    function autoResize(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function scrollToBottom() {
+        requestAnimationFrame(() => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+    }
+
+    function getTimeStr() {
+        const d = new Date();
+        return d.getHours().toString().padStart(2, '0') + ':' +
+               d.getMinutes().toString().padStart(2, '0');
+    }
+
+    /** 更新模式徽章 */
+    function updateModeBadge(mode) {
+        if (!mode) return;
+        lastMode = mode;
+        const modeMap = {
+            'react':            { icon: '⚡', text: 'REACT', cls: 'react' },
+            'plan_and_execute': { icon: '🗺', text: 'PLAN & EXEC', cls: 'plan_and_execute' },
+            'reflection':       { icon: '🔍', text: 'REFLECTION', cls: 'reflection' },
+            'cronjob':          { icon: '⏰', text: 'CRONJOB', cls: 'cronjob' }
+        };
+        const info = modeMap[mode] || modeMap['react'];
+        modeIcon.textContent = info.icon;
+        modeText.textContent = info.text;
+        modeBadge.className = 'mode-badge visible ' + info.cls;
+    }
+
+    /** 追加消息 */
+    function appendMessage(role, content, opts = {}) {
+        if (welcome) welcome.style.display = 'none';
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message ' + role;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'msg-avatar';
+        avatar.textContent = role === 'user' ? '👤' : '⚡';
+
+        const body = document.createElement('div');
+        body.className = 'msg-body';
+
+        // meta行
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta';
+
+        if (role === 'assistant' && opts.mode) {
+            const modeMap = {
+                'chat':              { text: 'CHAT', cls: 'chat' },
+                'react':            { text: 'REACT', cls: 'react' },
+                'plan_and_execute': { text: 'PLAN&EXEC', cls: 'plan_and_execute' },
+                'reflection':       { text: 'REFLECT', cls: 'reflection' },
+                'cronjob':          { text: 'CRONJOB', cls: 'cronjob' }
+            };
+            const m = modeMap[opts.mode] || modeMap['chat'];
+            const tag = document.createElement('span');
+            tag.className = 'msg-mode-tag ' + m.cls;
+            tag.textContent = m.text;
+            meta.appendChild(tag);
+        }
+
+        const time = document.createElement('span');
+        time.textContent = getTimeStr();
+        meta.appendChild(time);
+        body.appendChild(meta);
+
+        // 思考过程面板（放在回答前面）
+        if (role === 'assistant' && opts.thinkSteps && opts.thinkSteps.length > 0) {
+            body.appendChild(buildThinkPanel(opts.thinkSteps));
+        }
+
+        // 气泡
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble' + (opts.isError ? ' error' : '');
+
+        // assistant 消息使用 Markdown 渲染
+        if (role === 'assistant' && !opts.isError) {
+            bubble.classList.add('md-render');
+            bubble.innerHTML = renderMarkdown(content);
+            addCopyButtons(bubble);
+        } else {
+            bubble.textContent = content;
+        }
+        body.appendChild(bubble);
+
+        // 统计信息（仅 assistant 消息显示）
+        if (role === 'assistant' && (opts.durationMs || opts.totalTokens)) {
+            const stats = document.createElement('div');
+            stats.className = 'msg-stats';
+
+            if (opts.cached) {
+                const cachedTag = document.createElement('span');
+                cachedTag.className = 'cached-tag';
+                cachedTag.textContent = 'CACHED';
+                stats.appendChild(cachedTag);
+            }
+
+            if (opts.durationMs !== undefined) {
+                const durationItem = document.createElement('span');
+                durationItem.className = 'stat-item';
+                const durationSec = opts.durationMs < 1000
+                    ? opts.durationMs + 'ms'
+                    : (opts.durationMs / 1000).toFixed(1) + 's';
+                durationItem.innerHTML = '<span class="stat-icon">\u23F1</span><span class="stat-value">' + durationSec + '</span>';
+                stats.appendChild(durationItem);
+            }
+
+            if (opts.totalTokens !== undefined && opts.totalTokens > 0) {
+                const tokenItem = document.createElement('span');
+                tokenItem.className = 'stat-item';
+                tokenItem.innerHTML = '<span class="stat-icon">\u26A1</span><span class="stat-value">' + opts.totalTokens + ' tokens</span>';
+                stats.appendChild(tokenItem);
+            }
+
+            body.appendChild(stats);
+        }
+
+        msgDiv.appendChild(avatar);
+        msgDiv.appendChild(body);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+        return bubble;
+    }
+
+    /** 构建思考过程面板 */
+    function buildThinkPanel(steps) {
+        const STEP_META = {
+            routing:     { icon: '🧠', label: 'ROUTING' },
+            thought:     { icon: '💡', label: 'THOUGHT' },
+            action:      { icon: '⚡', label: 'ACTION' },
+            observation: { icon: '🔬', label: 'OBS' },
+            planning:    { icon: '🗺', label: 'PLAN' },
+            executing:   { icon: '▶️', label: 'EXEC' },
+            reflecting:  { icon: '🔄', label: 'REFLECT' },
+            refining:    { icon: '✏️', label: 'REFINE' },
+            summary:     { icon: '✅', label: 'SUMMARY' }
+        };
+
+        const panel = document.createElement('div');
+        panel.className = 'think-panel';
+
+        const toggle = document.createElement('div');
+        toggle.className = 'think-toggle';
+        toggle.innerHTML = '<span class="toggle-arrow">▶</span>'
+            + '<span>🧠 思考过程</span>'
+            + '<span style="margin-left:4px;color:var(--text-muted)">' + steps.length + ' 步</span>';
+
+        const stepsEl = document.createElement('div');
+        stepsEl.className = 'think-steps';
+
+        steps.forEach(step => {
+            const meta = STEP_META[step.type] || { icon: '•', label: step.type.toUpperCase() };
+            const stepDiv = document.createElement('div');
+            stepDiv.className = 'think-step';
+
+            const iconEl = document.createElement('div');
+            iconEl.className = 'step-icon ' + step.type;
+            iconEl.textContent = meta.icon;
+
+            const bodyEl = document.createElement('div');
+            bodyEl.className = 'step-body';
+
+            const titleEl = document.createElement('div');
+            titleEl.className = 'step-title ' + step.type;
+            titleEl.textContent = '[' + meta.label + '] ' + (step.title || '');
+
+            const contentEl = document.createElement('div');
+            contentEl.className = 'step-content';
+            contentEl.textContent = step.content || '';
+
+            bodyEl.appendChild(titleEl);
+            bodyEl.appendChild(contentEl);
+            stepDiv.appendChild(iconEl);
+            stepDiv.appendChild(bodyEl);
+            stepsEl.appendChild(stepDiv);
+        });
+
+        toggle.addEventListener('click', function () {
+            const open = stepsEl.classList.toggle('visible');
+            toggle.classList.toggle('open', open);
+        });
+
+        panel.appendChild(toggle);
+        panel.appendChild(stepsEl);
+        return panel;
+    }
+
+    /** 追加路由指示器 */
+    function appendRoutingIndicator() {
+        if (welcome) welcome.style.display = 'none';
+        const div = document.createElement('div');
+        div.className = 'routing-indicator';
+        div.id = 'routingMsg';
+        div.innerHTML = '<div class="routing-spinner"></div><span>Analyzing task & routing mode...</span>';
+        chatContainer.appendChild(div);
+        scrollToBottom();
+    }
+
+    function removeRoutingIndicator() {
+        const el = document.getElementById('routingMsg');
+        if (el) el.remove();
+    }
+
+    /** 追加打字指示器 */
+    function appendTypingIndicator() {
+        if (welcome) welcome.style.display = 'none';
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message assistant';
+        msgDiv.id = 'typingMsg';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'msg-avatar';
+        avatar.textContent = '⚡';
+
+        const body = document.createElement('div');
+        body.className = 'msg-body';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble';
+        bubble.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+        body.appendChild(bubble);
+        msgDiv.appendChild(avatar);
+        msgDiv.appendChild(body);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+    }
+
+    function removeTypingIndicator() {
+        const el = document.getElementById('typingMsg');
+        if (el) el.remove();
+    }
+
+    function setLoading(loading) {
+        isLoading = loading;
+        btnSend.disabled = loading;
+        userInput.disabled = loading;
+        if (loading) {
+            btnSend.innerHTML = '<span class="spinner"></span>思考中';
+        } else {
+            btnSend.textContent = '发送';
+            userInput.focus();
+        }
+    }
+
+    // ========== 核心逻辑 ==========
+
+    async function sendMessage() {
+        const message = userInput.value.trim();
+        if (!message || isLoading) return;
+
+        appendMessage('user', message);
+        userInput.value = '';
+        autoResize(userInput);
+
+        setLoading(true);
+        appendRoutingIndicator();
+
+        try {
+            const body = { message: message };
+            if (sessionId) body.sessionId = sessionId;
+
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            removeRoutingIndicator();
+
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+
+            const data = await response.json();
+
+            // 更新 sessionId
+            if (data.sessionId) {
+                sessionId = data.sessionId;
+                sessionTag.textContent = 'SID:' + sessionId.substring(0, 8);
+            }
+
+            // 更新模式徽章
+            if (data.mode) {
+                updateModeBadge(data.mode);
+            }
+
+            if (data.success) {
+                appendMessage('assistant', data.answer, {
+                    mode: data.mode,
+                    thinkSteps: data.thinkSteps,
+                    durationMs: data.durationMs,
+                    totalTokens: data.totalTokens,
+                    cached: data.cached
+                });
+            } else {
+                appendMessage('assistant', data.error || '未知错误', {
+                    isError: true,
+                    thinkSteps: data.thinkSteps,
+                    durationMs: data.durationMs,
+                    totalTokens: data.totalTokens
+                });
+            }
+
+        } catch (err) {
+            removeRoutingIndicator();
+            appendMessage('assistant', '请求失败: ' + err.message, { isError: true });
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function resetSession() {
+        sessionId = null;
+        lastMode = null;
+        sessionTag.textContent = 'ready';
+        modeBadge.className = 'mode-badge';
+        chatContainer.innerHTML = '';
+        chatContainer.innerHTML = '<div class="welcome" id="welcome">'
+            + '<div class="welcome-orb">\u26A1</div>'
+            + '<h2>Hi, 我是 NanoClaw</h2>'
+            + '<p>我会根据你的问题自动选择最合适的思考模式：<br>'
+            + '<strong style="color:var(--accent-blue)">Chat</strong> 直接对话 · '
+            + '<strong style="color:var(--accent-cyan)">ReAct</strong> 实时推理 · '
+            + '<strong style="color:var(--accent-purple)">Plan</strong> 规划执行 · '
+            + '<strong style="color:var(--accent-amber)">Reflect</strong> 深度反思</p>'
+            + '<div class="hint-tags">'
+            + '<div class="hint-tag" data-q="今天北京天气怎么样？">天气查询</div>'
+            + '<div class="hint-tag" data-q="帮我制定一个学习Java的30天计划">制定计划</div>'
+            + '<div class="hint-tag" data-q="请写一首关于春天的现代诗">诗歌创作</div>'
+            + '<div class="hint-tag" data-q="每天早上9点提醒我查看邮件">定时提醒</div>'
+            + '</div></div>';
+        bindHintTags();
+    }
+
+    function bindHintTags() {
+        document.querySelectorAll('.hint-tag').forEach(tag => {
+            tag.addEventListener('click', function() {
+                userInput.value = this.dataset.q;
+                autoResize(userInput);
+                sendMessage();
+            });
+        });
+    }
+
+    // ========== 事件绑定 ==========
+
+    btnSend.addEventListener('click', sendMessage);
+
+    userInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    userInput.addEventListener('input', function() { autoResize(this); });
+    btnReset.addEventListener('click', resetSession);
+    bindHintTags();
+    userInput.focus();
+
+    // ========== 定时任务功能 ==========
+
+    const btnCronJob = document.getElementById('btnCronJob');
+    const btnCronClose = document.getElementById('btnCronClose');
+    const cronjobPanel = document.getElementById('cronjobPanel');
+    const cronjobList = document.getElementById('cronjobList');
+    const cronjobEmpty = document.getElementById('cronjobEmpty');
+    const jobCount = document.getElementById('jobCount');
+    let cronPanelVisible = false;
+    let cronRefreshTimer = null;
+
+    /** 切换定时任务面板 */
+    function toggleCronPanel() {
+        cronPanelVisible = !cronPanelVisible;
+        if (cronPanelVisible) {
+            // 关闭另一个面板
+            if (memPanelVisible) toggleMemoryPanel();
+            cronjobPanel.classList.remove('collapsed');
+            loadCronJobs();
+            // 自动刷新
+            cronRefreshTimer = setInterval(loadCronJobs, 10000);
+        } else {
+            cronjobPanel.classList.add('collapsed');
+            if (cronRefreshTimer) {
+                clearInterval(cronRefreshTimer);
+                cronRefreshTimer = null;
+            }
+        }
+    }
+
+    /** 加载定时任务列表 */
+    async function loadCronJobs() {
+        try {
+            const resp = await fetch('/api/cron-jobs');
+            const data = await resp.json();
+            if (data.success) {
+                renderCronJobs(data.jobs || []);
+                jobCount.textContent = (data.total || 0) + ' 个任务';
+            }
+        } catch (e) {
+            console.error('加载定时任务失败:', e);
+        }
+    }
+
+    /** 渲染定时任务列表 */
+    function renderCronJobs(jobs) {
+        // 保留空状态元素
+        const cards = cronjobList.querySelectorAll('.cronjob-card');
+        cards.forEach(c => c.remove());
+
+        if (!jobs || jobs.length === 0) {
+            cronjobEmpty.style.display = 'block';
+            return;
+        }
+
+        cronjobEmpty.style.display = 'none';
+
+        jobs.forEach(job => {
+            const card = document.createElement('div');
+            card.className = 'cronjob-card';
+            card.dataset.jobId = job.id;
+
+            const statusClass = job.status ? job.status.toLowerCase() : 'active';
+            const statusText = { ACTIVE: '运行中', PAUSED: '已暂停', ERROR: '异常' }[job.status] || '运行中';
+
+            const nextRunStr = job.nextRunAt > 0 ? formatTime(job.nextRunAt) : '-';
+            const lastRunStr = job.lastRunAt > 0 ? formatTime(job.lastRunAt) : '未执行';
+
+            let actionBtns = '';
+            if (job.status === 'ACTIVE') {
+                actionBtns = '<button class="cronjob-action-btn" onclick="pauseCronJob(\'' + job.id + '\')">暂停</button>';
+            } else if (job.status === 'PAUSED') {
+                actionBtns = '<button class="cronjob-action-btn" onclick="resumeCronJob(\'' + job.id + '\')">恢复</button>';
+            }
+            actionBtns += '<button class="cronjob-action-btn danger" onclick="deleteCronJob(\'' + job.id + '\')">删除</button>';
+
+            // 构建执行历史
+            let historyHtml = '';
+            if (job.executionHistory && job.executionHistory.length > 0) {
+                historyHtml = '<div class="detail-section"><div class="detail-title">执行历史</div>';
+                job.executionHistory.slice(0, 5).forEach(r => {
+                    const rClass = r.success ? '' : ' fail';
+                    const rTime = formatTime(r.executedAt);
+                    const rText = (r.result || '').substring(0, 80);
+                    historyHtml += '<div class="history-item"><span class="history-time">' + rTime + '</span><span class="history-result' + rClass + '">' + rText + '</span></div>';
+                });
+                historyHtml += '</div>';
+            }
+
+            card.innerHTML = '<div class="cronjob-card-header">'
+                + '<div class="cronjob-card-title"><span class="cronjob-status-dot ' + statusClass + '"></span>' + escapeHtml(job.name || '定时任务') + '</div>'
+                + '<div class="cronjob-card-actions">' + actionBtns + '</div>'
+                + '</div>'
+                + '<div class="cronjob-card-body">'
+                + '<div class="cronjob-card-row"><span class="label">调度</span><span class="value">' + escapeHtml(job.scheduleDesc || job.cronExpression) + '</span></div>'
+                + '<div class="cronjob-card-row"><span class="label">执行</span><span class="value">' + escapeHtml(job.query || '') + '</span></div>'
+                + '<div class="cronjob-card-row"><span class="label">下次</span><span class="value">' + nextRunStr + '</span></div>'
+                + '<div class="cronjob-card-row"><span class="label">上次</span><span class="value">' + lastRunStr + '</span></div>'
+                + '<div class="cronjob-card-row"><span class="label">次数</span><span class="value">' + (job.runCount || 0) + '</span></div>'
+                + '</div>'
+                + '<div class="cronjob-card-detail" id="detail-' + job.id + '">' + historyHtml + '</div>';
+
+            // 点击卡片展开/收起详情
+            card.addEventListener('click', function(e) {
+                // 不处理按钮点击
+                if (e.target.classList.contains('cronjob-action-btn')) return;
+                const detail = document.getElementById('detail-' + job.id);
+                if (detail) detail.classList.toggle('visible');
+            });
+
+            cronjobList.appendChild(card);
+        });
+    }
+
+    /** 暂停定时任务 */
+    window.pauseCronJob = async function(jobId) {
+        try {
+            const resp = await fetch('/api/cron-jobs/' + jobId + '/pause', { method: 'PUT' });
+            const data = await resp.json();
+            if (data.success) loadCronJobs();
+        } catch (e) {
+            console.error('暂停失败:', e);
+        }
+    };
+
+    /** 恢复定时任务 */
+    window.resumeCronJob = async function(jobId) {
+        try {
+            const resp = await fetch('/api/cron-jobs/' + jobId + '/resume', { method: 'PUT' });
+            const data = await resp.json();
+            if (data.success) loadCronJobs();
+        } catch (e) {
+            console.error('恢复失败:', e);
+        }
+    };
+
+    /** 删除定时任务 */
+    window.deleteCronJob = async function(jobId) {
+        if (!confirm('确定删除该定时任务？')) return;
+        try {
+            const resp = await fetch('/api/cron-jobs/' + jobId, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) loadCronJobs();
+        } catch (e) {
+            console.error('删除失败:', e);
+        }
+    };
+
+    /** 格式化时间戳 */
+    function formatTime(ts) {
+        if (!ts || ts <= 0) return '-';
+        const d = new Date(ts);
+        const pad = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+            + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+
+    /** HTML转义 */
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    btnCronJob.addEventListener('click', toggleCronPanel);
+    btnCronClose.addEventListener('click', toggleCronPanel);
+
+    // ========== 记忆面板功能 ==========
+
+    const btnMemory = document.getElementById('btnMemory');
+    const btnMemClose = document.getElementById('btnMemClose');
+    const memoryPanel = document.getElementById('memoryPanel');
+    const memoryContent = document.getElementById('memoryContent');
+    const memSub = document.getElementById('memSub');
+    let memPanelVisible = false;
+    let memCurrentTab = 'profile';
+
+    function toggleMemoryPanel() {
+        memPanelVisible = !memPanelVisible;
+        if (memPanelVisible) {
+            // 关闭另一个面板
+            if (cronPanelVisible) toggleCronPanel();
+            memoryPanel.classList.remove('collapsed');
+            loadMemoryTab(memCurrentTab);
+        } else {
+            memoryPanel.classList.add('collapsed');
+        }
+    }
+
+    // Tab 点击
+    document.querySelectorAll('.memory-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.memory-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            memCurrentTab = this.dataset.tab;
+            loadMemoryTab(memCurrentTab);
+        });
+    });
+
+    async function loadMemoryTab(tab) {
+        memoryContent.innerHTML = '<div class="memory-empty"><div class="memory-empty-icon">⏳</div><p>加载中...</p></div>';
+        try {
+            if (tab === 'profile') {
+                const resp = await fetch('/api/memory/profile');
+                const data = await resp.json();
+                if (data.success) renderProfile(data.profile);
+            } else if (tab === 'global') {
+                const resp = await fetch('/api/memory/global');
+                const data = await resp.json();
+                if (data.success) renderGlobalMemory(data.content);
+            } else if (tab === 'daily') {
+                const resp = await fetch('/api/memory/daily/today');
+                const data = await resp.json();
+                if (data.success) renderDailyMemory(data.content);
+            }
+            // 更新子标题
+            const overview = await (await fetch('/api/memory/overview')).json();
+            if (overview.success) {
+                const d = overview.data;
+                const info = d.storageInfo || {};
+                memSub.textContent = (info.globalMemoryLength || 0) + ' 字长期 · ' + (info.dailyMemoryCount || 0) + ' 天日记';
+            }
+        } catch (e) {
+            memoryContent.innerHTML = '<div class="memory-empty"><div class="memory-empty-icon">❌</div><p>加载失败</p></div>';
+        }
+    }
+
+    function renderProfile(profile) {
+        if (!profile || Object.keys(profile).length === 0) {
+            memoryContent.innerHTML = '<div class="memory-empty"><div class="memory-empty-icon">🧠</div><p>暂无用户画像</p><p style="font-size:11px;margin-top:6px;">多聊几句后自动提取</p></div>';
+            return;
+        }
+
+        let html = '';
+
+        // 基本信息
+        const basic = profile.basicInfo || {};
+        if (Object.keys(basic).length > 0) {
+            html += '<div class="memory-section"><div class="memory-section-title">📋 基本信息</div><div class="profile-grid">';
+            for (const [k, v] of Object.entries(basic)) {
+                html += '<span class="pk">' + escapeHtml(k) + '</span><span class="pv">' + escapeHtml(v) + '</span>';
+            }
+            html += '</div></div>';
+        }
+
+        // 偏好
+        const prefs = profile.preferences || [];
+        if (prefs.length > 0 && !(prefs.length === 1 && prefs[0] === '暂无')) {
+            html += '<div class="memory-section"><div class="memory-section-title">⚙️ 偏好与习惯</div><ul class="profile-list">';
+            prefs.forEach(p => { html += '<li>' + escapeHtml(p) + '</li>'; });
+            html += '</ul></div>';
+        }
+
+        // 兴趣
+        const ints = profile.interests || [];
+        if (ints.length > 0 && !(ints.length === 1 && ints[0] === '暂无')) {
+            html += '<div class="memory-section"><div class="memory-section-title">🎯 兴趣领域</div><ul class="profile-list">';
+            ints.forEach(i => { html += '<li>' + escapeHtml(i) + '</li>'; });
+            html += '</ul></div>';
+        }
+
+        // 沟通风格
+        const comm = profile.communicationStyle || {};
+        if (Object.keys(comm).length > 0) {
+            html += '<div class="memory-section"><div class="memory-section-title">💬 沟通风格</div><div class="profile-grid">';
+            for (const [k, v] of Object.entries(comm)) {
+                html += '<span class="pk">' + escapeHtml(k) + '</span><span class="pv">' + escapeHtml(v) + '</span>';
+            }
+            html += '</div></div>';
+        }
+
+        // 关键标签
+        const tags = profile.keyTags || [];
+        if (tags.length > 0) {
+            html += '<div class="memory-section"><div class="memory-section-title">🏷️ 关键标签</div><div class="profile-tags">';
+            tags.forEach(t => { html += '<span class="profile-tag">' + escapeHtml(t) + '</span>'; });
+            html += '</div></div>';
+        }
+
+        // 操作按钮
+        html += '<div class="memory-actions">';
+        html += '<button class="memory-action-btn" onclick="triggerProfileUpdate()">🔄 更新画像</button>';
+        html += '<button class="memory-action-btn" onclick="triggerCompress()">📦 压缩记忆</button>';
+        html += '</div>';
+
+        memoryContent.innerHTML = html;
+    }
+
+    function renderGlobalMemory(content) {
+        if (!content || content.trim() === '') {
+            memoryContent.innerHTML = '<div class="memory-empty"><div class="memory-empty-icon">📝</div><p>暂无长期记忆</p><p style="font-size:11px;margin-top:6px;">对话积累后自动形成</p></div>';
+            return;
+        }
+
+        let html = '<div class="memory-section"><div class="memory-section-title">📚 长期记忆</div>';
+        html += '<div class="memory-text">' + escapeHtml(content) + '</div>';
+        html += '</div>';
+        html += '<div class="memory-stat"><div class="memory-stat-item"><div class="num">' + content.length + '</div><div class="lbl">字符数</div></div></div>';
+        html += '<div class="memory-actions">';
+        html += '<button class="memory-action-btn" onclick="triggerCompress()">📦 压缩</button>';
+        html += '</div>';
+
+        memoryContent.innerHTML = html;
+    }
+
+    function renderDailyMemory(content) {
+        if (!content || content.trim() === '') {
+            memoryContent.innerHTML = '<div class="memory-empty"><div class="memory-empty-icon">📅</div><p>今天还没有记忆</p><p style="font-size:11px;margin-top:6px;">发送消息后自动记录</p></div>';
+            return;
+        }
+
+        let html = '<div class="memory-section"><div class="memory-section-title">📖 今日对话记忆</div>';
+        html += '<div class="memory-text">' + escapeHtml(content) + '</div>';
+        html += '</div>';
+        html += '<div class="memory-stat"><div class="memory-stat-item"><div class="num">' + content.length + '</div><div class="lbl">字符数</div></div></div>';
+
+        memoryContent.innerHTML = html;
+    }
+
+    window.triggerProfileUpdate = async function() {
+        try {
+            await fetch('/api/memory/profile/update', { method: 'POST' });
+            loadMemoryTab('profile');
+        } catch (e) {
+            console.error('更新画像失败:', e);
+        }
+    };
+
+    window.triggerCompress = async function() {
+        try {
+            await fetch('/api/memory/compress', { method: 'POST' });
+            loadMemoryTab(memCurrentTab);
+        } catch (e) {
+            console.error('压缩失败:', e);
+        }
+    };
+
+    btnMemory.addEventListener('click', toggleMemoryPanel);
+    btnMemClose.addEventListener('click', toggleMemoryPanel);
+
+    // 当聊天创建cronjob成功后自动刷新列表
+    const _originalSendMessage = sendMessage;
+    sendMessage = function() {
+        const result = _originalSendMessage();
+        // 如果面板打开，延迟刷新列表
+        if (cronPanelVisible && result && typeof result.then === 'function') {
+            result.then(() => setTimeout(loadCronJobs, 1000));
+        }
+    };
+</script>
+
+</body>
+</html>
