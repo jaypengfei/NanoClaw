@@ -84,16 +84,13 @@ public class AgentLoop extends Agent {
      */
     @Override
     public AgentResponse run(AgentRequest agentRequest) {
-        String traceId = UUID.randomUUID().toString();
+        String traceId = newTraceId();
         AgentResponse result = new AgentResponse();
 
         // ========== 1. 参数校验 ==========
-        if (agentRequest == null || agentRequest.getQuery() == null
-                || agentRequest.getQuery().trim().isEmpty()) {
-            return AgentResponse.failure("请求参数无效：query不能为空", 0, traceId);
-        }
-        if (agentRequest.getModel() == null) {
-            return AgentResponse.failure("请求参数无效：model不能为空", 0, traceId);
+        AgentResponse validateResult = validateRequest(agentRequest);
+        if (validateResult != null) {
+            return validateResult;
         }
 
         // ========== 2. 组装上下文 ==========
@@ -241,9 +238,7 @@ public class AgentLoop extends Agent {
         StringBuilder sb = new StringBuilder();
 
         // 用户自定义 prompt 作为前缀
-        if (customPrompt != null && !customPrompt.trim().isEmpty()) {
-            sb.append(customPrompt).append("\n\n");
-        }
+        sb.append(buildCustomPromptPrefix(customPrompt));
 
         // ReAct 格式指引
         sb.append("你是一个能够推理和行动的助手。你必须严格按照以下格式回答:\n\n");
@@ -284,50 +279,6 @@ public class AgentLoop extends Agent {
             return null;
         }
         return content.substring(idx + FINAL_ANSWER_MARKER.length()).trim();
-    }
-
-    /**
-     * 从模型输出中提取 Action 名称
-     *
-     * @param content 模型输出文本
-     * @return 提取到的 Action 名称，不存在则返回 null
-     */
-    private String extractAction(String content) {
-        if (content == null) {
-            return null;
-        }
-        int idx = content.indexOf(ACTION_MARKER);
-        if (idx < 0) {
-            return null;
-        }
-        int start = idx + ACTION_MARKER.length();
-        int end = content.indexOf("\n", start);
-        if (end < 0) {
-            end = content.length();
-        }
-        return content.substring(start, end).trim();
-    }
-
-    /**
-     * 从模型输出中提取 Action Input
-     *
-     * @param content 模型输出文本
-     * @return 提取到的 Action Input，不存在则返回 null
-     */
-    private String extractActionInput(String content) {
-        if (content == null) {
-            return null;
-        }
-        int idx = content.indexOf(ACTION_INPUT_MARKER);
-        if (idx < 0) {
-            return null;
-        }
-        int start = idx + ACTION_INPUT_MARKER.length();
-        int end = content.indexOf("\n", start);
-        if (end < 0) {
-            end = content.length();
-        }
-        return content.substring(start, end).trim();
     }
 
     /**

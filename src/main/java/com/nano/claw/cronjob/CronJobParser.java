@@ -77,55 +77,6 @@ public class CronJobParser {
         public boolean isRuleMatched() { return ruleMatched; }
     }
 
-    /** 规则模式 */
-    private static class ParseRule {
-        final Pattern pattern;
-        final String cronTemplate;
-        final String scheduleDesc;
-
-        ParseRule(Pattern pattern, String cronTemplate, String scheduleDesc) {
-            this.pattern = pattern;
-            this.cronTemplate = cronTemplate;
-            this.scheduleDesc = scheduleDesc;
-        }
-    }
-
-    /** 常见中文时间表达规则 */
-    private static final List<ParseRule> TIME_RULES = new ArrayList<>();
-
-    static {
-        // 每天早上/上午 X 点
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每天?(?:早上|上午|早晨)\\s*(\\d+)[点时](?:半)?"),
-                null, null // 动态生成
-        ));
-        // 每天下午/晚上 X 点
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每天?(?:下午|晚上|傍晚|晚间)\\s*(\\d+)[点时](?:半)?"),
-                null, null
-        ));
-        // 每天 X 点
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每天\\s*(\\d+)[点时](?:半)?"),
-                null, null
-        ));
-        // 每隔 X 分钟/小时
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每隔\\s*(\\d+)\\s*(分钟|小时|分|小时)"),
-                null, null
-        ));
-        // 每周一/周二/... X 点
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每周?(一|二|三|四|五|六|日|天)\\s*(?:早上|上午|下午|晚上)?\\s*(\\d+)?[点时]?"),
-                null, null
-        ));
-        // 每天 X 点 X 分
-        TIME_RULES.add(new ParseRule(
-                Pattern.compile("每天\\s*(\\d+)[点时](\\d+)分?"),
-                null, null
-        ));
-    }
-
     /** LLM 解析用的 system prompt */
     private static final String PARSER_SYSTEM_PROMPT =
             "你是一个定时任务解析专家。你的任务是将用户的自然语言描述解析为结构化的定时任务信息。\n\n"

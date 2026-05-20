@@ -9,6 +9,7 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 定时任务调度管理器
@@ -42,10 +43,10 @@ public class CronJobManager {
     public void init() {
         // 创建2个核心线程的调度线程池
         scheduler = Executors.newScheduledThreadPool(2, new ThreadFactory() {
-            private int count = 0;
+            private final AtomicInteger count = new AtomicInteger(0);
             @Override
             public Thread newThread(Runnable r) {
-                Thread t = new Thread(r, "cronjob-worker-" + (++count));
+                Thread t = new Thread(r, "cronjob-worker-" + count.incrementAndGet());
                 t.setDaemon(true);
                 return t;
             }
@@ -74,7 +75,7 @@ public class CronJobManager {
      * @param job 定时任务
      * @return 添加后的任务（含计算好的nextRunAt）
      */
-    public synchronized CronJob addJob(CronJob job) {
+    public CronJob addJob(CronJob job) {
         jobs.put(job.getId(), job);
         scheduleJob(job);
         log.info("[CRON-MGR] 添加定时任务: id={}, name={}, cron={}", job.getId(), job.getName(), job.getCronExpression());
@@ -87,7 +88,7 @@ public class CronJobManager {
      * @param jobId 任务ID
      * @return 是否删除成功
      */
-    public synchronized boolean removeJob(String jobId) {
+    public boolean removeJob(String jobId) {
         CronJob job = jobs.remove(jobId);
         if (job != null) {
             cancelSchedule(jobId);
@@ -103,7 +104,7 @@ public class CronJobManager {
      * @param jobId 任务ID
      * @return 暂停后的任务，不存在返回null
      */
-    public synchronized CronJob pauseJob(String jobId) {
+    public CronJob pauseJob(String jobId) {
         CronJob job = jobs.get(jobId);
         if (job == null) {
             return null;
@@ -121,7 +122,7 @@ public class CronJobManager {
      * @param jobId 任务ID
      * @return 恢复后的任务，不存在返回null
      */
-    public synchronized CronJob resumeJob(String jobId) {
+    public CronJob resumeJob(String jobId) {
         CronJob job = jobs.get(jobId);
         if (job == null) {
             return null;

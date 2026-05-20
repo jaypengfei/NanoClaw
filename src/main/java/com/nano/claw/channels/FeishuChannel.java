@@ -51,17 +51,16 @@ public class FeishuChannel implements Channel {
                 return false;
             }
 
-            // 构建飞书消息体
-            ObjectMapper mapper = new ObjectMapper();
-            com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
+            // 构建飞书消息体（复用静态 MAPPER）
+            com.fasterxml.jackson.databind.node.ObjectNode body = MAPPER.createObjectNode();
             body.put("receive_id", chatId);
             body.put("msg_type", "text");
 
-            com.fasterxml.jackson.databind.node.ObjectNode textContent = mapper.createObjectNode();
+            com.fasterxml.jackson.databind.node.ObjectNode textContent = MAPPER.createObjectNode();
             textContent.put("text", content);
             body.set("content", textContent);
 
-            String jsonBody = mapper.writeValueAsString(body);
+            String jsonBody = MAPPER.writeValueAsString(body);
             String url = FEISHU_BASE_URL + "/im/v1/messages?receive_id_type=chat_id";
 
             String response = HttpUtils.postWithAuth(url, "Bearer " + token, jsonBody);
@@ -81,15 +80,14 @@ public class FeishuChannel implements Channel {
                 return false;
             }
 
-            ObjectMapper mapper = new ObjectMapper();
-            com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
+            com.fasterxml.jackson.databind.node.ObjectNode body = MAPPER.createObjectNode();
             body.put("msg_type", "text");
 
-            com.fasterxml.jackson.databind.node.ObjectNode textContent = mapper.createObjectNode();
+            com.fasterxml.jackson.databind.node.ObjectNode textContent = MAPPER.createObjectNode();
             textContent.put("text", content);
             body.set("content", textContent);
 
-            String jsonBody = mapper.writeValueAsString(body);
+            String jsonBody = MAPPER.writeValueAsString(body);
             String url = FEISHU_BASE_URL + "/im/v1/messages/" + originalMsgId + "/reply";
 
             String response = HttpUtils.postWithAuth(url, "Bearer " + token, jsonBody);
@@ -173,18 +171,17 @@ public class FeishuChannel implements Channel {
         }
 
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            com.fasterxml.jackson.databind.node.ObjectNode body = mapper.createObjectNode();
+            com.fasterxml.jackson.databind.node.ObjectNode body = MAPPER.createObjectNode();
             body.put("app_id", appId);
             body.put("app_secret", appSecret);
 
-            String jsonBody = mapper.writeValueAsString(body);
+            String jsonBody = MAPPER.writeValueAsString(body);
             String url = FEISHU_BASE_URL + "/auth/v3/tenant_access_token/internal";
 
             String response = HttpUtils.post(url, null, jsonBody);
             if (response == null) return null;
 
-            JsonNode result = mapper.readTree(response);
+            JsonNode result = MAPPER.readTree(response);
             if (result.has("tenant_access_token")) {
                 tenantAccessToken = result.get("tenant_access_token").asText();
                 int expire = result.has("expire") ? result.get("expire").asInt() : 7200;

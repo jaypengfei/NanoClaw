@@ -27,16 +27,13 @@ public class ChatAgent extends Agent {
 
     @Override
     public AgentResponse run(AgentRequest agentRequest) {
-        String traceId = UUID.randomUUID().toString();
-
         // ========== 1. 参数校验 ==========
-        if (agentRequest == null || agentRequest.getQuery() == null
-                || agentRequest.getQuery().trim().isEmpty()) {
-            return AgentResponse.failure("请求参数无效：query不能为空", 0, traceId);
+        AgentResponse validateResult = validateRequest(agentRequest);
+        if (validateResult != null) {
+            return validateResult;
         }
-        if (agentRequest.getModel() == null) {
-            return AgentResponse.failure("请求参数无效：model不能为空", 0, traceId);
-        }
+
+        String traceId = newTraceId();
 
         AgentResponse result = new AgentResponse();
         result.setTraceId(traceId);
@@ -84,9 +81,7 @@ public class ChatAgent extends Agent {
     private String buildSystemPrompt(String customPrompt) {
         StringBuilder sb = new StringBuilder();
 
-        if (customPrompt != null && !customPrompt.trim().isEmpty()) {
-            sb.append(customPrompt).append("\n\n");
-        }
+        sb.append(buildCustomPromptPrefix(customPrompt));
 
         sb.append("你是一个智能助手。请直接回答用户的问题，给出清晰、准确、有用的回答。");
         return sb.toString();

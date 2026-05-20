@@ -51,16 +51,13 @@ public class PlanExecuteAgent extends Agent {
 
     @Override
     public AgentResponse run(AgentRequest agentRequest) {
-        String traceId = UUID.randomUUID().toString();
-
         // ========== 1. 参数校验 ==========
-        if (agentRequest == null || agentRequest.getQuery() == null
-                || agentRequest.getQuery().trim().isEmpty()) {
-            return AgentResponse.failure("请求参数无效：query不能为空", 0, traceId);
+        AgentResponse validateResult = validateRequest(agentRequest);
+        if (validateResult != null) {
+            return validateResult;
         }
-        if (agentRequest.getModel() == null) {
-            return AgentResponse.failure("请求参数无效：model不能为空", 0, traceId);
-        }
+
+        String traceId = newTraceId();
 
         int totalLoopCount = 0;
         AgentResponse result = new AgentResponse();
@@ -267,9 +264,11 @@ public class PlanExecuteAgent extends Agent {
     /**
      * 从步骤描述中提取 Action Input
      */
-    private String extractActionInput(String step) {
+    protected String extractActionInput(String step) {
         int idx = step.indexOf("Action Input:");
-        if (idx < 0) return null;
+        if (idx < 0) {
+            return null;
+        }
 
         int start = step.indexOf(":", idx) + 1;
         int bracketIdx = step.indexOf("]", start);

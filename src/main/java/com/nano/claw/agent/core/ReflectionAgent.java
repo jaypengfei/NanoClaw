@@ -52,16 +52,13 @@ public class ReflectionAgent extends Agent {
 
     @Override
     public AgentResponse run(AgentRequest agentRequest) {
-        String traceId = UUID.randomUUID().toString();
-
         // ========== 1. 参数校验 ==========
-        if (agentRequest == null || agentRequest.getQuery() == null
-                || agentRequest.getQuery().trim().isEmpty()) {
-            return AgentResponse.failure("请求参数无效：query不能为空", 0, traceId);
+        AgentResponse validateResult = validateRequest(agentRequest);
+        if (validateResult != null) {
+            return validateResult;
         }
-        if (agentRequest.getModel() == null) {
-            return AgentResponse.failure("请求参数无效：model不能为空", 0, traceId);
-        }
+
+        String traceId = newTraceId();
 
         int loopCount = 0;
         AgentResponse result = new AgentResponse();
@@ -167,9 +164,7 @@ public class ReflectionAgent extends Agent {
      */
     private String buildGeneratorPrompt(String customPrompt) {
         StringBuilder sb = new StringBuilder();
-        if (customPrompt != null && !customPrompt.trim().isEmpty()) {
-            sb.append(customPrompt).append("\n\n");
-        }
+        sb.append(buildCustomPromptPrefix(customPrompt));
         sb.append("你是一个专业的助手。请给出详细、准确的回答。\n");
         sb.append("如果你需要借助工具获取信息，请使用以下格式:\n");
         sb.append("Action: <工具名称>\n");
@@ -223,35 +218,15 @@ public class ReflectionAgent extends Agent {
     private String executeToolsFromReflection(com.nano.claw.llm.Model model, String traceId,
                                                String query, String currentAnswer, String reflection) {
         String actionName = extractAction(reflection);
-        String actionInput = extractActionInput(reflection);
+        String actionInputStr = extractActionInput(reflection);
 
         if (actionName == null || !toolRegistry.hasTool(actionName)) {
             return null;
         }
 
         Tool tool = toolRegistry.getTool(actionName);
-        ToolResult toolResult = tool.execute(actionInput != null ? actionInput : "");
+        ToolResult toolResult = tool.execute(actionInputStr != null ? actionInputStr : "");
 
         return "通过调用工具 " + actionName + " 获取的信息: " + toolResult.toObservation();
-    }
-
-    private String extractAction(String content) {
-        if (content == null) return null;
-        int idx = content.indexOf("Action:");
-        if (idx < 0) return null;
-        int start = idx + "Action:".length();
-        int end = content.indexOf("\n", start);
-        if (end < 0) end = content.length();
-        return content.substring(start, end).trim();
-    }
-
-    private String extractActionInput(String content) {
-        if (content == null) return null;
-        int idx = content.indexOf("Action Input:");
-        if (idx < 0) return null;
-        int start = idx + "Action Input:".length();
-        int end = content.indexOf("\n", start);
-        if (end < 0) end = content.length();
-        return content.substring(start, end).trim();
     }
 }

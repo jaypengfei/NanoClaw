@@ -66,7 +66,7 @@ public class ChatFlow {
 
     private final SessionManager sessionManager = new SessionManager();
     private final ToolRegistry toolRegistry = new ToolRegistry();
-    private final Map<String, Channel> channels = new HashMap<>();
+    private final Map<String, Channel> channels = new ConcurrentHashMap<>();
 
     @Resource
     private CronJobManager cronJobManager;
@@ -315,7 +315,7 @@ public class ChatFlow {
         clone.setSessionId(source.getSessionId());
         clone.setError(source.getError());
         clone.setMode(source.getMode());
-        clone.setThinkSteps(source.getThinkSteps());
+        clone.setThinkSteps(new ArrayList<>(source.getThinkSteps()));
         clone.setDurationMs(source.getDurationMs());
         clone.setTotalTokens(source.getTotalTokens());
         clone.setCached(source.isCached());
