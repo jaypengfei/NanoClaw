@@ -149,6 +149,9 @@ public class ModeRouter {
                 .replace("-", "_")
                 .replace(" ", "_");
 
+        if (normalized.contains("expert_panel") || normalized.contains("expertpanel") || normalized.contains("专家团")) {
+            return "expert_panel";
+        }
         if (normalized.contains("cronjob") || normalized.contains("cron") || normalized.contains("cron_job") || normalized.contains("定时任务")) {
             return "cronjob";
         }

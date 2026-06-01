@@ -107,6 +107,20 @@ public class MemoryService {
         }
     }
 
+    /**
+     * 保存一条用户问句到独立的 user-queries.md 文件
+     * <p>
+     * 独立存储便于后续检索（如仅拼接最近 N 轮提问作为上下文）
+     */
+    public void saveUserQuery(String userMessage) {
+        if (userMessage == null || userMessage.trim().isEmpty()) return;
+        try {
+            fileStore.appendUserQuery(userMessage);
+        } catch (Exception e) {
+            log.warn("[MEM-SERVICE] 保存用户问句失败", e);
+        }
+    }
+
     // ==================== 记忆读取（构建上下文） ====================
 
     /**
@@ -131,10 +145,18 @@ public class MemoryService {
             context.append("## 长期记忆\n\n").append(globalMemory).append("\n\n");
         }
 
-        // 3. 最近3天每日记忆
-        String recentMemory = fileStore.readRecentDailyMemories(3);
-        if (recentMemory != null && !recentMemory.trim().isEmpty()) {
-            context.append("## 近期对话记忆\n\n").append(recentMemory).append("\n\n");
+        // 3. 最近 3 轮用户提问（仅问句本身，不拼接助手回复，避免上下文过长）
+        try {
+            java.util.List<String> recentQueries = fileStore.readRecentUserQueries(3);
+            if (recentQueries != null && !recentQueries.isEmpty()) {
+                context.append("## 最近用户提问（近 ").append(recentQueries.size()).append(" 轮）\n\n");
+                for (String q : recentQueries) {
+                    context.append("- ").append(q).append("\n");
+                }
+                context.append("\n");
+            }
+        } catch (Exception e) {
+            log.warn("[MEM-SERVICE] 读取最近用户提问失败", e);
         }
 
         if (context.length() > 0) {

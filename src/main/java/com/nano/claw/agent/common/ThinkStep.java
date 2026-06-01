@@ -32,7 +32,17 @@ public class ThinkStep {
         /** 最终汇总 */
         SUMMARY,
         /** Chat 直接对话 */
-        CHAT
+        CHAT,
+        /** 专家团：调度专家开始执行 */
+        EXPERT_DISPATCH,
+        /** 专家团：专家产出结果 */
+        EXPERT_RESULT,
+        /** 专家团：角色请求其他角色协作 */
+        EXPERT_COLLABORATE,
+        /** 专家团：角色拒绝参与 */
+        EXPERT_DECLINE,
+        /** 专家团：角色回退交互（提问/打回需求） */
+        EXPERT_BOUNCE
     }
 
     /** 步骤类型 */

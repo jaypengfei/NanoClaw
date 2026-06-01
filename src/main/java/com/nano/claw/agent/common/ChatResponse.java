@@ -30,6 +30,8 @@ public class ChatResponse {
     private int totalTokens;
     /** 是否来自缓存 */
     private boolean cached;
+    /** 项目工作区ID */
+    private String projectId;
 
     public ChatResponse() {
     }
@@ -135,5 +137,13 @@ public class ChatResponse {
 
     public void setCached(boolean cached) {
         this.cached = cached;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 }

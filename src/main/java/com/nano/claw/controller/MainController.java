@@ -9,7 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
 
@@ -33,7 +35,7 @@ public class MainController {
     private ChatFlow chatFlow;
 
     /**
-     * 通用聊天接口
+     * 通用聊天接口（同步，供飞书等渠道使用）
      *
      * @param request 请求参数
      * @return 聊天响应
@@ -43,6 +45,21 @@ public class MainController {
         log.info("[CHAT] 收到请求 >>> 消息: {}, 会话: {}, 模式: {}",
                 request.getMessage(), request.getSessionId(), request.getMode());
         return chatFlow.chat(request);
+    }
+
+    /**
+     * SSE 流式聊天接口（Web 前端使用）
+     * <p>
+     * 实时推送思考步骤（think_step 事件）和最终答案（done 事件）
+     *
+     * @param request 请求参数
+     * @return SseEmitter
+     */
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStream(@RequestBody ChatRequest request) {
+        log.info("[CHAT-SSE] 收到流式请求 >>> 消息: {}, 会话: {}, 模式: {}",
+                request.getMessage(), request.getSessionId(), request.getMode());
+        return chatFlow.chatStream(request);
     }
 
     /**

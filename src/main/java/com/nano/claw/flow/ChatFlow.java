@@ -7,9 +7,11 @@ import com.nano.claw.agent.common.ChatResponse;
 import com.nano.claw.agent.common.ThinkStep;
 import com.nano.claw.agent.core.Agent;
 import com.nano.claw.agent.core.AgentFactory;
+import com.nano.claw.agent.core.ExpertPanelAgent;
 import com.nano.claw.agent.core.ModeRouter;
 import com.nano.claw.agent.mcp.CalculatorTool;
 import com.nano.claw.agent.mcp.HttpTool;
+import com.nano.claw.agent.mcp.SkillManager;
 import com.nano.claw.agent.mcp.ToolRegistry;
 import com.nano.claw.channels.Channel;
 import com.nano.claw.channels.ChannelMessage;
@@ -18,13 +20,20 @@ import com.nano.claw.cronjob.CronJob;
 import com.nano.claw.cronjob.CronJobManager;
 import com.nano.claw.cronjob.CronJobParser;
 import com.nano.claw.llm.Model;
+import com.nano.claw.llm.ModelFacade;
+import com.nano.claw.llm.ModelRequest;
+import com.nano.claw.llm.ModelResponse;
 import com.nano.claw.memory.ConversationMemory;
 import com.nano.claw.memory.MemoryService;
+import com.nano.claw.messages.Message;
 import com.nano.claw.sessions.SessionManager;
+import com.nano.claw.workspace.ProjectWorkspace;
+import com.nano.claw.workspace.WorkspaceManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -35,6 +44,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * 聊天编排层 - 串联会话管理、Agent调用、通道分发
@@ -73,6 +88,18 @@ public class ChatFlow {
 
     @Resource
     private MemoryService memoryService;
+
+    @Resource
+    private WorkspaceManager workspaceManager;
+
+    @Resource
+    private SkillManager skillManager;
+
+    @Resource
+    private ApplicationContext applicationContext;
+
+    /** SSE 异步线程池 */
+    private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
     /** 问句结果缓存，key=问句文本，value=缓存条目 */
     private final ConcurrentHashMap<String, CacheEntry> queryCache = new ConcurrentHashMap<>();
@@ -113,7 +140,298 @@ public class ChatFlow {
         // 设置 ChatFlow 引用到 CronJobManager
         cronJobManager.setChatFlow(this);
 
-        log.info("ChatFlow 初始化完成，工具数: {}，通道数: {}", toolRegistry.getToolDescriptions().split("\n").length, channels.size());
+        // 注入 Spring ApplicationContext 到 ExpertPanelAgent
+        ExpertPanelAgent.setApplicationContext(applicationContext);
+
+        log.info("ChatFlow 初始化完成，工具数: {}，通道数: {}，技能数: {}", 
+                toolRegistry.getToolDescriptions().split("\n").length, channels.size(),
+                skillManager != null ? skillManager.getSkillRegistry().size() : 0);
+    }
+
+    /**
+     * SSE 流式聊天接口（Web 前端使用）
+     * <p>
+     * 异步执行 Agent，实时推送：
+     * - think_step 事件：每个 ThinkStep
+     * - done 事件：ChatResponse（含最终答案）
+     */
+    public SseEmitter chatStream(ChatRequest request) {
+        SseEmitter emitter = new SseEmitter(180_000L); // 3分钟超时
+
+        // 跟踪 emitter 是否已完成（客户端断开 / 超时 / 已 complete 等场景），
+        // 避免向已完成的 emitter 继续 send 触发 IllegalStateException
+        final AtomicBoolean completed = new AtomicBoolean(false);
+        emitter.onCompletion(() -> completed.set(true));
+        emitter.onTimeout(() -> {
+            completed.set(true);
+            log.warn("[FLOW-SSE] SseEmitter 超时，自动完成");
+            try { emitter.complete(); } catch (Exception ignored) {}
+        });
+        emitter.onError(t -> {
+            completed.set(true);
+            log.warn("[FLOW-SSE] SseEmitter 异常: {}", t.getMessage());
+        });
+
+        // 安全发送：emitter 已完成时直接跳过；发送失败则标记完成，后续调用自动变为 no-op
+        final Consumer<SseEmitter.SseEventBuilder> safeSend = (event) -> {
+            if (completed.get()) return;
+            try {
+                emitter.send(event);
+            } catch (Exception e) {
+                completed.set(true);
+                log.warn("[FLOW-SSE] 发送 SSE 事件失败，可能客户端已断开: {}", e.getMessage());
+            }
+        };
+        final Runnable safeComplete = () -> {
+            if (completed.compareAndSet(false, true)) {
+                try { emitter.complete(); } catch (Exception ignored) {}
+            }
+        };
+
+        sseExecutor.submit(() -> {
+            try {
+                // 确定会话ID
+                String sessionId = request.getSessionId();
+                if (sessionId == null || sessionId.isEmpty()) {
+                    sessionId = UUID.randomUUID().toString();
+                }
+                final String finalSessionId = sessionId;
+
+                // 持久化用户问句到独立文件（用于上下文检索）
+                memoryService.saveUserQuery(request.getMessage());
+
+                // 选择模型和模式
+                Model model = resolveModel(defaultModelName);
+                String agentMode = request.getMode();
+                List<ThinkStep> allSteps = new ArrayList<>();
+                boolean ruleMatched = false;
+                String ruleName = null;
+
+                if (agentMode == null || agentMode.isEmpty()) {
+                    ModeRouter.RouteResult routeResult = ModeRouter.route(request.getMessage(), model);
+                    agentMode = routeResult.getMode();
+                    ruleMatched = routeResult.isRuleMatched();
+                    ruleName = routeResult.getRuleName();
+                    String routingDesc = ruleMatched
+                            ? "规则引擎快速匹配，命中规则: " + ruleName + "，选择模式: " + agentMode
+                            : "规则未命中，LLM智能路由，选择模式: " + agentMode;
+                    ThinkStep routingStep = ThinkStep.of(ThinkStep.Type.ROUTING, "智能路由决策", routingDesc, 0);
+                    allSteps.add(routingStep);
+                    // 实时推送路由步骤
+                    safeSend.accept(SseEmitter.event()
+                            .name("think_step")
+                            .data(routingStep, MediaType.APPLICATION_JSON));
+                }
+
+                // cronjob 模式特殊处理
+                if ("cronjob".equals(agentMode)) {
+                    long start = System.currentTimeMillis();
+                    ChatResponse resp = handleCronJobCreation(request, finalSessionId, allSteps, start);
+                    safeSend.accept(SseEmitter.event()
+                            .name("done")
+                            .data(resp, MediaType.APPLICATION_JSON));
+                    safeComplete.run();
+                    return;
+                }
+
+                // expert_panel 模式特殊处理
+                if ("expert_panel".equals(agentMode)) {
+                    long start = System.currentTimeMillis();
+                    ProjectWorkspace projectWorkspace;
+                    String existingProjectId = request.getProjectId();
+                    if (existingProjectId != null && !existingProjectId.isEmpty()) {
+                        projectWorkspace = workspaceManager.getWorkspace(existingProjectId);
+                    } else {
+                        String projectName = request.getMessage().length() > 30
+                                ? request.getMessage().substring(0, 30) + "..." : request.getMessage();
+                        projectWorkspace = workspaceManager.createWorkspace(projectName, request.getMessage());
+                    }
+                    AgentRequest expertRequest = new AgentRequest();
+                    expertRequest.setQuery(request.getMessage());
+                    expertRequest.setModel(model);
+                    expertRequest.setSessionId(projectWorkspace != null ? projectWorkspace.getId() : finalSessionId);
+                    // 设置 think_step 实时推送回调
+                    expertRequest.setThinkStepConsumer(step -> {
+                        try {
+                            allSteps.add(step);
+                            safeSend.accept(SseEmitter.event()
+                                    .name("think_step")
+                                    .data(step, MediaType.APPLICATION_JSON));
+                        } catch (Exception ignored) {}
+                    });
+                    Agent expertAgent = AgentFactory.create("expert_panel", toolRegistry);
+                    AgentResponse expertResponse = expertAgent.run(expertRequest);
+                    if (expertResponse.isSuccess()) {
+                        ConversationMemory memory = sessionManager.getOrCreate(finalSessionId);
+                        memory.addMessage(new com.nano.claw.messages.Message("user", request.getMessage()));
+                        memory.addMessage(new com.nano.claw.messages.Message("assistant", expertResponse.getAnswer()));
+                    }
+                    ChatResponse chatResponse;
+                    if (expertResponse.isSuccess()) {
+                        chatResponse = ChatResponse.success(expertResponse.getAnswer(), finalSessionId, "expert_panel", allSteps);
+                    } else {
+                        chatResponse = ChatResponse.failure(expertResponse.getError(), finalSessionId);
+                        chatResponse.setThinkSteps(allSteps);
+                    }
+                    chatResponse.setDurationMs(System.currentTimeMillis() - start);
+                    chatResponse.setTotalTokens(expertResponse.getTotalTokens());
+                    chatResponse.setProjectId(projectWorkspace != null ? projectWorkspace.getId() : null);
+                    safeSend.accept(SseEmitter.event()
+                            .name("done")
+                            .data(chatResponse, MediaType.APPLICATION_JSON));
+                    safeComplete.run();
+                    return;
+                }
+
+                // 普通 Agent 模式
+                long startTime = System.currentTimeMillis();
+                ConversationMemory memory = sessionManager.getOrCreate(finalSessionId);
+
+                final String finalAgentMode = agentMode;
+
+                // ========== chat 模式：直接流式调用 LLM，逐 token 推送 ==========
+                if ("chat".equals(agentMode)) {
+                    // 记录思考步骤
+                    ThinkStep chatStep = ThinkStep.of(ThinkStep.Type.CHAT, "直接对话", request.getMessage(), 1);
+                    allSteps.add(chatStep);
+                    safeSend.accept(SseEmitter.event()
+                            .name("think_step")
+                            .data(chatStep, MediaType.APPLICATION_JSON));
+
+                    // 构建 system prompt
+                    String memoryContext = memoryService.buildSystemPromptMemorySection();
+                    String systemPrompt = (memoryContext != null && !memoryContext.isEmpty())
+                            ? memoryContext + "\n\n你是一个智能助手。请直接回答用户的问题，给出清晰、准确、有用的回答。"
+                            : "你是一个智能助手。请直接回答用户的问题，给出清晰、准确、有用的回答。";
+
+                    List<Message> messages = new ArrayList<>();
+                    messages.add(new Message("system", systemPrompt));
+                    messages.add(new Message("user", request.getMessage()));
+
+                    ModelRequest modelRequest = new ModelRequest(model, UUID.randomUUID().toString(), messages);
+
+                    // 流式调用 LLM，逐 token 推送 answer_chunk
+                    ModelResponse modelResponse = ModelFacade.chatCompletionStream(modelRequest, token -> {
+                        try {
+                            safeSend.accept(SseEmitter.event()
+                                    .name("answer_chunk")
+                                    .data(token, MediaType.TEXT_PLAIN));
+                        } catch (Exception ignored) {}
+                    });
+
+                    // 保存对话记忆
+                    String answer = modelResponse.isSuccess() ? modelResponse.getContent() : "";
+                    memory.addMessage(new Message("user", request.getMessage()));
+                    if (modelResponse.isSuccess()) {
+                        memory.addMessage(new Message("assistant", answer));
+                        try {
+                            memoryService.saveConversation(request.getMessage(), answer);
+                        } catch (Exception e) {
+                            log.warn("[FLOW] 保存持久化记忆失败", e);
+                        }
+                    }
+
+                    // 发送 done 事件（含元数据）
+                    ChatResponse chatResponse;
+                    if (modelResponse.isSuccess()) {
+                        chatResponse = ChatResponse.success(answer, finalSessionId, "chat", allSteps);
+                    } else {
+                        chatResponse = ChatResponse.failure(modelResponse.getError(), finalSessionId);
+                        chatResponse.setThinkSteps(allSteps);
+                    }
+                    chatResponse.setDurationMs(System.currentTimeMillis() - startTime);
+                    chatResponse.setTotalTokens(modelResponse.getTotalTokens());
+
+                    safeSend.accept(SseEmitter.event()
+                            .name("done")
+                            .data(chatResponse, MediaType.APPLICATION_JSON));
+                    safeComplete.run();
+                    return;
+                }
+
+                // ========== 其他 Agent 模式（react/plan/reflection）==========
+                AgentRequest agentRequest = new AgentRequest();
+                agentRequest.setQuery(request.getMessage());
+                agentRequest.setModel(model);
+                agentRequest.setSessionId(finalSessionId);
+
+                String memoryContext = memoryService.buildSystemPromptMemorySection();
+                if (memoryContext != null && !memoryContext.isEmpty()) {
+                    agentRequest.setSystemPrompt(memoryContext);
+                }
+
+                // 设置 think_step 实时推送回调
+                agentRequest.setThinkStepConsumer(step -> {
+                    try {
+                        allSteps.add(step);
+                        safeSend.accept(SseEmitter.event()
+                                .name("think_step")
+                                .data(step, MediaType.APPLICATION_JSON));
+                    } catch (Exception ignored) {}
+                });
+
+                Agent agent = AgentFactory.create(agentMode, toolRegistry, skillManager);
+                AgentResponse agentResponse = agent.run(agentRequest);
+
+                // Agent执行完毕，将最终答案流式推送
+                if (agentResponse.isSuccess() && agentResponse.getAnswer() != null) {
+                    // 将最终答案分块推送（模拟流式效果）
+                    String fullAnswer = agentResponse.getAnswer();
+                    int chunkSize = 20; // 每次推送约20个字符
+                    for (int i = 0; i < fullAnswer.length(); i += chunkSize) {
+                        String chunk = fullAnswer.substring(i, Math.min(i + chunkSize, fullAnswer.length()));
+                        safeSend.accept(SseEmitter.event()
+                                .name("answer_chunk")
+                                .data(chunk, MediaType.TEXT_PLAIN));
+                    }
+                }
+
+                memory.addMessage(new Message("user", request.getMessage()));
+                if (agentResponse.isSuccess()) {
+                    memory.addMessage(new Message("assistant", agentResponse.getAnswer()));
+                    try {
+                        memoryService.saveConversation(request.getMessage(), agentResponse.getAnswer());
+                    } catch (Exception e) {
+                        log.warn("[FLOW] 保存持久化记忆失败", e);
+                    }
+                }
+
+                ChatResponse chatResponse;
+                if (agentResponse.isSuccess()) {
+                    chatResponse = ChatResponse.success(agentResponse.getAnswer(), finalSessionId, finalAgentMode, allSteps);
+                } else {
+                    chatResponse = ChatResponse.failure(agentResponse.getError(), finalSessionId);
+                    chatResponse.setThinkSteps(allSteps);
+                }
+                chatResponse.setDurationMs(System.currentTimeMillis() - startTime);
+                chatResponse.setTotalTokens(agentResponse.getTotalTokens());
+
+                safeSend.accept(SseEmitter.event()
+                        .name("done")
+                        .data(chatResponse, MediaType.APPLICATION_JSON));
+                safeComplete.run();
+
+            } catch (Exception e) {
+                if (completed.get()) {
+                    log.warn("[FLOW-SSE] emitter 已完成（客户端可能已断开），跳过错误响应: {}", e.getMessage());
+                    return;
+                }
+                log.error("[FLOW-SSE] 流式处理异常", e);
+                try {
+                    ChatResponse errResp = ChatResponse.failure(e.getMessage(), null);
+                    safeSend.accept(SseEmitter.event()
+                            .name("done")
+                            .data(errResp, MediaType.APPLICATION_JSON));
+                    safeComplete.run();
+                } catch (Exception ex) {
+                    if (!completed.get()) {
+                        try { emitter.completeWithError(ex); } catch (Exception ignored) {}
+                    }
+                }
+            }
+        });
+
+        return emitter;
     }
 
     /**
@@ -130,6 +448,9 @@ public class ChatFlow {
         } else {
             log.info("[FLOW] 继续会话: {}", sessionId);
         }
+
+        // 持久化用户问句到独立文件（用于上下文检索）
+        memoryService.saveUserQuery(request.getMessage());
 
         // ========== 缓存检查：相同问句直接返回 ==========
         String cacheKey = request.getMessage().trim();
@@ -180,6 +501,43 @@ public class ChatFlow {
             return handleCronJobCreation(request, sessionId, allSteps, startTime);
         }
 
+        // ========== expert_panel 模式特殊处理：专家团协作 ==========
+        if ("expert_panel".equals(agentMode)) {
+            // 创建或获取项目工作区
+            ProjectWorkspace projectWorkspace;
+            String existingProjectId = request.getProjectId();
+            if (existingProjectId != null && !existingProjectId.isEmpty()) {
+                projectWorkspace = workspaceManager.getWorkspace(existingProjectId);
+            } else {
+                String projectName = request.getMessage().length() > 30
+                        ? request.getMessage().substring(0, 30) + "..." : request.getMessage();
+                projectWorkspace = workspaceManager.createWorkspace(projectName, request.getMessage());
+            }
+
+            AgentRequest expertRequest = new AgentRequest();
+            expertRequest.setQuery(request.getMessage());
+            expertRequest.setModel(resolveModel(defaultModelName));
+            expertRequest.setSessionId(projectWorkspace != null ? projectWorkspace.getId() : sessionId);
+            Agent expertAgent = AgentFactory.create("expert_panel", toolRegistry);
+            AgentResponse expertResponse = expertAgent.run(expertRequest);
+            allSteps.addAll(expertResponse.getThinkSteps());
+            if (expertResponse.isSuccess()) {
+                memory.addMessage(new com.nano.claw.messages.Message("user", request.getMessage()));
+                memory.addMessage(new com.nano.claw.messages.Message("assistant", expertResponse.getAnswer()));
+            }
+            ChatResponse chatResponse;
+            if (expertResponse.isSuccess()) {
+                chatResponse = ChatResponse.success(expertResponse.getAnswer(), sessionId, "expert_panel", allSteps);
+            } else {
+                chatResponse = ChatResponse.failure(expertResponse.getError(), sessionId);
+                chatResponse.setThinkSteps(allSteps);
+            }
+            chatResponse.setDurationMs(System.currentTimeMillis() - startTime);
+            chatResponse.setTotalTokens(expertResponse.getTotalTokens());
+            chatResponse.setProjectId(projectWorkspace != null ? projectWorkspace.getId() : null);
+            return chatResponse;
+        }
+
         AgentRequest agentRequest = new AgentRequest();
         agentRequest.setQuery(request.getMessage());
         agentRequest.setModel(model);
@@ -194,7 +552,7 @@ public class ChatFlow {
 
         // 创建并运行 Agent
         log.info("[FLOW] >>> 开始执行 Agent, 用户输入: {}", request.getMessage());
-        Agent agent = AgentFactory.create(agentMode, toolRegistry);
+        Agent agent = AgentFactory.create(agentMode, toolRegistry, skillManager);
         AgentResponse agentResponse = agent.run(agentRequest);
         log.info("[FLOW] <<< Agent 执行完毕, 成功: {}, 迭代轮次: {}", agentResponse.isSuccess(), agentResponse.getLoopCount());
 

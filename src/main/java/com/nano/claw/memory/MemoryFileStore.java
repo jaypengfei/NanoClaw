@@ -7,6 +7,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -116,6 +117,44 @@ public class MemoryFileStore {
         String filename = "memory-" + LocalDate.now().format(DATE_FMT) + ".md";
         appendFile(resolve(filename), content);
         log.info("[MEM-STORE] 每日记忆已追加: {}", filename);
+    }
+
+    // ==================== user-queries.md（用户问句历史） ====================
+
+    private static final DateTimeFormatter QUERY_TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    /**
+     * 追加一条用户问句到 user-queries.md（单行存储，换行转义）
+     */
+    public void appendUserQuery(String query) {
+        if (query == null || query.trim().isEmpty()) return;
+        String timestamp = LocalDateTime.now().format(QUERY_TS_FMT);
+        String safeQuery = query.replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n");
+        String line = "[" + timestamp + "] " + safeQuery + "\n";
+        appendFile(resolve("user-queries.md"), line);
+    }
+
+    /**
+     * 读取全部用户问句列表（按追加顺序返回）
+     */
+    public List<String> readAllUserQueries() {
+        String content = readFile(resolve("user-queries.md"));
+        if (content == null || content.trim().isEmpty()) return Collections.emptyList();
+        List<String> result = new ArrayList<>();
+        for (String line : content.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) result.add(trimmed);
+        }
+        return result;
+    }
+
+    /**
+     * 读取最近 N 条用户问句（按时间升序返回）
+     */
+    public List<String> readRecentUserQueries(int n) {
+        List<String> all = readAllUserQueries();
+        if (all.size() <= n) return all;
+        return new ArrayList<>(all.subList(all.size() - n, all.size()));
     }
 
     /**

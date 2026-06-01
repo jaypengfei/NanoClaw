@@ -3,6 +3,8 @@ package com.nano.claw.agent.core;
 import com.nano.claw.agent.common.AgentRequest;
 import com.nano.claw.agent.common.AgentResponse;
 import com.nano.claw.agent.common.ThinkStep;
+import com.nano.claw.agent.mcp.Skill;
+import com.nano.claw.agent.mcp.SkillManager;
 import com.nano.claw.agent.mcp.Tool;
 import com.nano.claw.agent.mcp.ToolRegistry;
 import com.nano.claw.agent.mcp.ToolResult;
@@ -49,12 +51,27 @@ public class AgentLoop extends Agent {
      */
     private final ToolRegistry toolRegistry;
 
+    /**
+     * 技能管理器（可选）
+     */
+    private SkillManager skillManager;
+
+    /** 匹配到的活跃技能列表，会在 run 时自动选择 */
+    private List<Skill> activeSkills;
+
     public AgentLoop() {
         this.toolRegistry = new ToolRegistry();
     }
 
     public AgentLoop(ToolRegistry toolRegistry) {
         this.toolRegistry = toolRegistry;
+    }
+
+    /**
+     * 设置技能管理器
+     */
+    public void setSkillManager(SkillManager skillManager) {
+        this.skillManager = skillManager;
     }
 
     /**
@@ -94,6 +111,16 @@ public class AgentLoop extends Agent {
         }
 
         // ========== 2. 组装上下文 ==========
+        // 2.1 自动选择技能
+        if (skillManager != null) {
+            activeSkills = skillManager.autoSelectSkills(agentRequest.getQuery());
+            if (!activeSkills.isEmpty()) {
+                addThinkStep(agentRequest, result, ThinkStep.of(ThinkStep.Type.ROUTING,
+                        "技能匹配", "自动匹配到技能: " + activeSkills.stream()
+                                .map(Skill::getName).reduce((a, b) -> a + ", " + b).orElse(""), 0));
+            }
+        }
+
         String systemPrompt = buildSystemPrompt(agentRequest.getSystemPrompt());
         List<Message> messages = new ArrayList<>();
         messages.add(new Message("system", systemPrompt));
@@ -175,12 +202,20 @@ public class AgentLoop extends Agent {
 
             // 3.8 执行工具
             String observation;
-            if (toolRegistry.hasTool(actionName)) {
+            if (skillManager != null && skillManager.isSkillAction(actionName)) {
+                // 执行技能工具
+                observation = skillManager.executeSkillAction(actionName, actionInput != null ? actionInput : "");
+            } else if (toolRegistry.hasTool(actionName)) {
                 Tool tool = toolRegistry.getTool(actionName);
                 ToolResult toolResult = tool.execute(actionInput != null ? actionInput : "");
                 observation = toolResult.toObservation();
             } else {
-                observation = "工具 '" + actionName + "' 不存在。可用工具: " + toolRegistry.getToolDescriptions();
+                // 构建可用工具和技能列表
+                String available = toolRegistry.getToolDescriptions();
+                if (skillManager != null) {
+                    available += "\n" + skillManager.getSkillRegistry().getSkillDescriptions();
+                }
+                observation = "工具 '" + actionName + "' 不存在。可用工具:\n" + available;
             }
 
             // 3.9 记录 Observation
@@ -260,6 +295,28 @@ public class AgentLoop extends Agent {
         // 工具描述
         sb.append("可用工具:\n");
         sb.append(toolRegistry.getToolDescriptions());
+
+        // 技能描述（如果有匹配到的技能）
+        if (skillManager != null) {
+            List<Skill> skills = (activeSkills != null && !activeSkills.isEmpty())
+                    ? activeSkills : skillManager.getSkillRegistry().getEnabledSkills();
+            if (!skills.isEmpty()) {
+                sb.append("\n可用技能（使用 Action: skill_<技能名> 调用）:\n");
+                for (Skill skill : skills) {
+                    sb.append("- skill_").append(skill.getName()).append(": ").append(skill.getDescription());
+                    if (!skill.getTriggerKeywords().isEmpty()) {
+                        sb.append(" [触发词: ").append(String.join(",", skill.getTriggerKeywords())).append("]");
+                    }
+                    sb.append("\n");
+                }
+            }
+
+            // 注入匹配技能的 prompt 模板
+            String skillPrompt = skillManager.buildSkillPrompt(skills);
+            if (skillPrompt != null && !skillPrompt.isEmpty()) {
+                sb.append(skillPrompt);
+            }
+        }
 
         return sb.toString();
     }

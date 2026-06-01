@@ -1,5 +1,6 @@
 package com.nano.claw.agent.core;
 
+import com.nano.claw.agent.mcp.SkillManager;
 import com.nano.claw.agent.mcp.ToolRegistry;
 
 /**
@@ -24,31 +25,60 @@ public class AgentFactory {
         /** Chat 直接对话模式 */
         CHAT,
         /** 定时任务模式 */
-        CRONJOB
+        CRONJOB,
+        /** 专家团协作模式 */
+        EXPERT_PANEL
     }
 
     /**
-     * 根据模式创建 Agent（使用共享的 ToolRegistry 和 SkillRegistry）
+     * 根据模式创建 Agent（使用共享的 ToolRegistry 和 SkillManager）
      *
      * @param mode          Agent模式
      * @param toolRegistry  工具注册中心
      * @return Agent实例
      */
     public static Agent create(AgentMode mode, ToolRegistry toolRegistry) {
+        return create(mode, toolRegistry, null);
+    }
+
+    /**
+     * 根据模式创建 Agent（使用共享的 ToolRegistry 和 SkillManager）
+     *
+     * @param mode          Agent模式
+     * @param toolRegistry  工具注册中心
+     * @param skillManager  技能管理器
+     * @return Agent实例
+     */
+    public static Agent create(AgentMode mode, ToolRegistry toolRegistry, SkillManager skillManager) {
+        Agent agent;
         switch (mode) {
             case REACT:
-                return new AgentLoop(toolRegistry);
+                agent = new AgentLoop(toolRegistry);
+                break;
             case PLAN_AND_EXECUTE:
-                return new PlanExecuteAgent(toolRegistry);
+                agent = new PlanExecuteAgent(toolRegistry);
+                break;
             case REFLECTION:
-                return new ReflectionAgent(toolRegistry);
+                agent = new ReflectionAgent(toolRegistry);
+                break;
             case CHAT:
-                return new ChatAgent();
+                agent = new ChatAgent();
+                break;
             case CRONJOB:
-                return new ChatAgent();  // cronjob复用ChatAgent，具体逻辑在ChatFlow中处理
+                agent = new ChatAgent();  // cronjob复用ChatAgent，具体逻辑在ChatFlow中处理
+                break;
+            case EXPERT_PANEL:
+                agent = new ExpertPanelAgent();
+                break;
             default:
-                return new AgentLoop(toolRegistry);
+                agent = new AgentLoop(toolRegistry);
+                break;
         }
+        // 注入 SkillManager（如果 Agent 支持）
+        if (skillManager != null && agent instanceof AgentLoop) {
+            ((AgentLoop) agent).setSkillManager(skillManager);
+        }
+        return agent;
     }
 
     /**
@@ -59,8 +89,20 @@ public class AgentFactory {
      * @return Agent实例
      */
     public static Agent create(String modeName, ToolRegistry toolRegistry) {
+        return create(modeName, toolRegistry, null);
+    }
+
+    /**
+     * 根据模式名称创建 Agent
+     *
+     * @param modeName      模式名称（不区分大小写）
+     * @param toolRegistry  工具注册中心
+     * @param skillManager  技能管理器
+     * @return Agent实例
+     */
+    public static Agent create(String modeName, ToolRegistry toolRegistry, SkillManager skillManager) {
         AgentMode mode = parseMode(modeName);
-        return create(mode, toolRegistry);
+        return create(mode, toolRegistry, skillManager);
     }
 
     /**
@@ -90,6 +132,10 @@ public class AgentFactory {
             case "CRON_JOB":
             case "CRON":
                 return AgentMode.CRONJOB;
+            case "EXPERT_PANEL":
+            case "EXPERTPANEL":
+            case "PANEL":
+                return AgentMode.EXPERT_PANEL;
             default:
                 return AgentMode.REACT;
         }

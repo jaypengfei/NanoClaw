@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -67,9 +68,17 @@ public class IntentRuleEngine {
     private static final List<Rule> RULES = new ArrayList<>();
 
     static {
+        // ========== EXPERT_PANEL 规则：专家团协作意图 ==========
+        RULES.add(new Rule("专家团协作", "expert_panel",
+                patterns("\u5c55开.*对话", "\u4e13家.*分析", "\u591a角色.*分析",
+                        "产品.*架构.*开发", "需求分析.*方案"),
+                kw("专家团", "多角色", "多个角色", "销售产品开发", "销售架构师",
+                        "全流程分析", "软件开发全流程", "项目全局分析",
+                        "系统开效分析", "多角度分析", "expert_panel", "专家咨询")));
+
         // ========== CRONJOB 规则：定时任务意图 ==========
         RULES.add(new Rule("定时任务", "cronjob",
-                patterns("每天.*提醒", "每天.*定时", "每隔.*提醒", "每周.*提醒",
+                patterns("每隔.*提醒", "每周.*提醒",
                         "每天.*点.*执行", "定时.*执行", "定期.*执行",
                         "每天.*点.*查", "每天.*点.*检查", "每天.*点.*推送",
                         "设置.*定时", "添加.*定时", "创建.*定时", "新建.*定时",
@@ -144,9 +153,15 @@ public class IntentRuleEngine {
         RULES.add(new Rule("闲聊情感", "chat",
                 null,
                 kw("笑话", "搞笑", "开心", "难过", "无聊", "心情")));
-
-        // ========== CRONJOB 规则（关键词兜底）：定时任务意图 ==========
-        RULES.add(new Rule("定时任务兜底", "cronjob",
+        
+        // ========== SKILL 规则：技能触发意图 ==========
+        RULES.add(new Rule("技能调用", "react",
+                null,
+                kw("技能", "使用技能", "调用技能", "skill", "安装技能", "卸载技能",
+                        "启用技能", "禁用技能")));
+        
+        // ========== CRONJOB 规则（关键词兆底）：定时任务意图 ==========
+        RULES.add(new Rule("定时任务兆底", "cronjob",
                 null,
                 kw("定时", "每天", "每隔", "定期", "每周", "每月", "周期")));
     }
@@ -195,9 +210,7 @@ public class IntentRuleEngine {
     /** 快速构建关键词列表 */
     private static List<String> kw(String... keywords) {
         List<String> list = new ArrayList<>();
-        for (String k : keywords) {
-            list.add(k);
-        }
+        list.addAll(Arrays.asList(keywords));
         return list;
     }
 
@@ -212,7 +225,9 @@ public class IntentRuleEngine {
 
     /** 截断日志输出 */
     private static String truncate(String text) {
-        if (text == null) return "";
+        if (text == null) {
+            return "";
+        }
         return text.length() > 60 ? text.substring(0, 60) + "..." : text;
     }
 }

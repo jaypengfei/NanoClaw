@@ -1,6 +1,7 @@
 package com.nano.claw.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nano.claw.messages.Message;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import java.util.function.Consumer;
 
 /**
  * 大模型调用的入口
@@ -123,6 +125,86 @@ public class ModelFacade {
                 return "MiniMax-M2.7";
             default:
                 return "MiniMax-M2.7";
+        }
+    }
+
+    /**
+     * 流式调用大模型（stream=true）—— 逐 token 回调
+     * <p>
+     * 大模型 API 返回 SSE 格式，每行 `data: {...}` 包含 delta.content。
+     * 这个方法逐块解析并通过 tokenConsumer 回调每个 token 片段，
+     * 最终返回完整拼接的响应。
+     *
+     * @param request       请求参数
+     * @param tokenConsumer 每次收到一个 token 片段时回调
+     * @return 完整的 ModelResponse
+     */
+    public static ModelResponse chatCompletionStream(ModelRequest request, Consumer<String> tokenConsumer) {
+        try {
+            // 1. 组装请求体
+            ObjectNode requestBody = MAPPER.createObjectNode();
+            String modelName = resolveModelName(request.getModel());
+            requestBody.put("model", modelName);
+            requestBody.put("stream", true);
+
+            // 2. 组装消息列表
+            ArrayNode messages = MAPPER.createArrayNode();
+            for (Message msg : request.getMessages()) {
+                ObjectNode msgNode = MAPPER.createObjectNode();
+                msgNode.put("role", msg.getRole());
+                msgNode.put("content", msg.getContent());
+                messages.add(msgNode);
+            }
+            requestBody.set("messages", messages);
+
+            String jsonRequest = MAPPER.writeValueAsString(requestBody);
+
+            String effectiveApiKey = apiKey;
+            String effectiveApiUrl = apiUrl;
+            if (effectiveApiUrl == null || effectiveApiUrl.isEmpty()) {
+                effectiveApiUrl = "https://api.minimax.chat/v1/chat/completions";
+            }
+
+            // 3. 流式调用，逐行解析
+            StringBuilder fullContent = new StringBuilder();
+            final int[] totalTokens = {0};
+
+            HttpUtils.postStream(effectiveApiUrl, effectiveApiKey, jsonRequest, line -> {
+                if (line == null || line.isEmpty()) return;
+                if (!line.startsWith("data:")) return;
+
+                String data = line.substring(5).trim();
+                if ("[DONE]".equals(data)) return;
+
+                try {
+                    JsonNode chunk = MAPPER.readTree(data);
+                    // 提取 delta content
+                    JsonNode choices = chunk.get("choices");
+                    if (choices != null && choices.size() > 0) {
+                        JsonNode delta = choices.get(0).get("delta");
+                        if (delta != null && delta.has("content")) {
+                            String token = delta.get("content").asText();
+                            if (token != null && !token.isEmpty()) {
+                                fullContent.append(token);
+                                tokenConsumer.accept(token);
+                            }
+                        }
+                    }
+                    // 提取 usage（通常在最后一个 chunk）
+                    if (chunk.has("usage") && chunk.get("usage").has("total_tokens")) {
+                        totalTokens[0] = chunk.get("usage").get("total_tokens").asInt();
+                    }
+                } catch (Exception e) {
+                    // 单行解析失败不影响整体流程
+                    log.debug("[LLM-Stream] 解析chunk失败: {}", data);
+                }
+            });
+
+            return new ModelResponse(request.getTraceId(), fullContent.toString(), true, null, totalTokens[0]);
+
+        } catch (Exception e) {
+            log.error("[LLM-Stream] 流式调用失败", e);
+            return new ModelResponse(request.getTraceId(), null, false, "模型流式调用失败: " + e.getMessage());
         }
     }
 

@@ -17,6 +17,8 @@ public class ChatRequest {
     private String mode;
     /** 渠道来源：feishu / api / web */
     private String channel;
+    /** 项目工作区ID，为空时自动创建新工作区 */
+    private String projectId;
 
     public ChatRequest() {
     }
@@ -51,5 +53,13 @@ public class ChatRequest {
 
     public void setChannel(String channel) {
         this.channel = channel;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 }

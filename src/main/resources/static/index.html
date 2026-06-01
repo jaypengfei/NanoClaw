@@ -246,6 +246,12 @@
             border: 1px solid rgba(245, 158, 11, 0.3);
         }
 
+        .mode-badge.expert_panel {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
         .mode-badge .mode-icon { font-size: 13px; }
 
         .session-tag {
@@ -429,6 +435,11 @@
         .msg-mode-tag.cronjob {
             background: rgba(245, 158, 11, 0.1);
             color: var(--accent-amber);
+        }
+
+        .msg-mode-tag.expert_panel {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
         }
 
         .msg-bubble {
@@ -671,7 +682,13 @@
         .step-icon.executing { background: rgba(245,158,11,0.15); }
         .step-icon.reflecting { background: rgba(6,182,212,0.15); }
         .step-icon.refining  { background: rgba(59,130,246,0.15); }
-        .step-icon.summary   { background: rgba(16,185,129,0.15); }
+        .step-icon.summary         { background: rgba(16,185,129,0.15); }
+        .step-icon.expert_dispatch  { background: rgba(16,185,129,0.15); }
+        .step-icon.expert_result    { background: rgba(6,182,212,0.15); }
+        .step-icon.expert_collaborate { background: rgba(59,130,246,0.15); }
+        .step-icon.expert_decline    { background: rgba(239,68,68,0.15); }
+        .step-icon.expert_bounce     { background: rgba(245,158,11,0.15); }
+        .step-icon.chat              { background: rgba(59,130,246,0.15); }
 
         .step-body { flex: 1; min-width: 0; }
 
@@ -690,7 +707,13 @@
         .step-title.executing  { color: var(--accent-amber); }
         .step-title.reflecting { color: var(--accent-cyan); }
         .step-title.refining   { color: var(--accent-blue); }
-        .step-title.summary    { color: var(--accent-green); }
+        .step-title.summary         { color: var(--accent-green); }
+        .step-title.expert_dispatch  { color: var(--accent-green); }
+        .step-title.expert_result    { color: var(--accent-cyan); }
+        .step-title.expert_collaborate { color: var(--accent-blue); }
+        .step-title.expert_decline    { color: #f87171; }
+        .step-title.expert_bounce     { color: var(--accent-amber); }
+        .step-title.chat              { color: var(--accent-blue); }
 
         .step-content {
             font-size: 11px;
@@ -760,6 +783,24 @@
         @keyframes typing-bounce {
             0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
             30% { transform: translateY(-8px); opacity: 1; }
+        }
+
+        /* ===== 打字机光标 ===== */
+        .tw-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.1em;
+            background: var(--accent-cyan);
+            margin-left: 2px;
+            vertical-align: text-bottom;
+            animation: tw-blink 0.8s step-end infinite;
+            border-radius: 1px;
+            box-shadow: 0 0 6px rgba(6, 182, 212, 0.4);
+        }
+
+        @keyframes tw-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
         }
 
         /* ===== 路由动画 ===== */
@@ -872,6 +913,36 @@
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
+        }
+
+        .stop-bar {
+            display: none;
+            justify-content: center;
+            padding: 8px 0 4px;
+        }
+
+        .stop-bar.visible {
+            display: flex;
+        }
+
+        .btn-stop {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 20px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+            white-space: nowrap;
+            font-family: inherit;
+            box-shadow: 0 2px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 18px rgba(239, 68, 68, 0.4);
         }
 
         .btn-send .spinner {
@@ -1403,6 +1474,913 @@
             margin-bottom: 8px;
             opacity: 0.4;
         }
+
+        /* ===== 技能侧边栏 ===== */
+        .skills-panel {
+            width: 400px;
+            background: rgba(15, 21, 35, 0.95);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .skills-panel.collapsed {
+            width: 0;
+            border-left: none;
+            opacity: 0;
+        }
+        .skills-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .skills-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .skills-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(245, 158, 11, 0.12);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--accent-amber);
+        }
+        .skills-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .skills-header .skills-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .skills-close-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .skills-close-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-amber);
+        }
+        .skills-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 12px;
+        }
+        .skills-tab {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .skills-tab:hover { color: var(--text-secondary); }
+        .skills-tab.active { color: var(--accent-amber); border-bottom-color: var(--accent-amber); }
+        .skills-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .skills-content::-webkit-scrollbar { width: 4px; }
+        .skills-content::-webkit-scrollbar-track { background: transparent; }
+        .skills-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .skills-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .skills-empty-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            opacity: 0.4;
+        }
+        .skill-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
+        }
+        .skill-card:hover {
+            border-color: rgba(245, 158, 11, 0.3);
+            box-shadow: 0 2px 12px rgba(245, 158, 11, 0.06);
+        }
+        .skill-card.disabled {
+            opacity: 0.6;
+        }
+        .skill-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .skill-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .skill-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .skill-status-dot.enabled {
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+        .skill-status-dot.disabled {
+            background: var(--text-muted);
+        }
+        .skill-card-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .skill-action-btn {
+            padding: 3px 8px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .skill-action-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-amber);
+        }
+        .skill-action-btn.danger:hover {
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+        .skill-card-body {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .skill-card-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+        .skill-card-row .label {
+            color: var(--text-muted);
+            min-width: 48px;
+        }
+        .skill-card-row .value {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+        }
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        .skill-tag {
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            color: var(--accent-amber);
+            font-size: 10px;
+            font-weight: 500;
+        }
+        .skill-source-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .skill-source-badge.builtin { background: rgba(6, 182, 212, 0.12); color: var(--accent-cyan); }
+        .skill-source-badge.local { background: rgba(139, 92, 246, 0.12); color: var(--accent-purple); }
+        .skill-source-badge.marketplace { background: rgba(16, 185, 129, 0.12); color: var(--accent-green); }
+        /* 安装表单 */
+        .skill-install-form {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+        .skill-install-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .skill-form-group {
+            margin-bottom: 12px;
+        }
+        .skill-form-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .skill-form-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .skill-form-input:focus {
+            border-color: var(--accent-amber);
+        }
+        .skill-form-textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            outline: none;
+            transition: border-color 0.2s;
+            resize: vertical;
+            min-height: 200px;
+            box-sizing: border-box;
+        }
+        .skill-form-textarea:focus {
+            border-color: var(--accent-amber);
+        }
+        .skill-form-textarea::placeholder {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+        .skill-install-btn {
+            width: 100%;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(245,158,11,0.8), rgba(245,158,11,0.6));
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .skill-install-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+        .skill-install-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .skill-install-hint {
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .skill-install-hint code {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--accent-amber);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+        .skill-rescan-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .skill-rescan-btn:hover {
+            color: var(--accent-amber);
+            border-color: var(--accent-amber);
+        }
+
+        /* ===== expert_panel 模式样式 ===== */
+        .mode-badge.expert_panel {
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .msg-mode-tag.expert_panel {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+        }
+        .step-icon.expert_dispatch { background: rgba(16,185,129,0.15); }
+        .step-icon.expert_result   { background: rgba(6,182,212,0.15); }
+        .step-icon.expert_collaborate { background: rgba(59,130,246,0.15); }
+        .step-icon.expert_decline    { background: rgba(239,68,68,0.15); }
+        .step-icon.expert_bounce     { background: rgba(245,158,11,0.15); }
+        .step-icon.chat              { background: rgba(59,130,246,0.15); }
+        .step-title.expert_dispatch { color: var(--accent-green); }
+        .step-title.expert_result   { color: var(--accent-cyan); }
+        .step-title.expert_collaborate { color: var(--accent-blue); }
+        .step-title.expert_decline    { color: #f87171; }
+        .step-title.expert_bounce     { color: var(--accent-amber); }
+        .step-title.chat              { color: var(--accent-blue); }
+
+        /* ===== 专家团侧边栏 ===== */
+        .expert-panel {
+            width: 380px;
+            background: rgba(15, 21, 35, 0.95);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .expert-panel.collapsed {
+            width: 0;
+            border-left: none;
+            opacity: 0;
+        }
+        .expert-panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .expert-panel-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .expert-panel-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .expert-panel-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .expert-panel-header .expert-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .expert-close-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .expert-close-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-green);
+        }
+        .expert-agents-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .expert-agents-list::-webkit-scrollbar { width: 4px; }
+        .expert-agents-list::-webkit-scrollbar-track { background: transparent; }
+        .expert-agents-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .expert-agent-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            transition: all 0.25s;
+        }
+        .expert-agent-card.running {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.12);
+            animation: expert-pulse 1.5s ease-in-out infinite;
+        }
+        .expert-agent-card.done {
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+        .expert-agent-card.pending {
+            opacity: 0.55;
+        }
+        .expert-agent-card.declined {
+            opacity: 0.4;
+            border-color: rgba(239,68,68,0.2);
+        }
+        .expert-agent-card.bounced {
+            border-color: rgba(245,158,11,0.4);
+        }
+        @keyframes expert-pulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(16, 185, 129, 0.1); }
+            50% { box-shadow: 0 0 18px rgba(16, 185, 129, 0.25); }
+        }
+        .expert-agent-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .expert-agent-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .expert-agent-avatar.pending  { background: rgba(74, 85, 104, 0.3); }
+        .expert-agent-avatar.running  { background: rgba(16, 185, 129, 0.18); }
+        .expert-agent-avatar.done     { background: rgba(6, 182, 212, 0.15); }
+        .expert-agent-avatar.declined { background: rgba(239, 68, 68, 0.12); }
+        .expert-agent-avatar.bounced  { background: rgba(245, 158, 11, 0.15); }
+        .expert-agent-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .expert-agent-status-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .expert-agent-status-badge.pending  { background: rgba(74,85,104,0.2); color: var(--text-muted); }
+        .expert-agent-status-badge.running  { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+        .expert-agent-status-badge.done     { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+        .expert-agent-status-badge.declined { background: rgba(239,68,68,0.12); color: #f87171; }
+        .expert-agent-status-badge.bounced  { background: rgba(245,158,11,0.12); color: var(--accent-amber); }
+        .expert-agent-preview {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            max-height: 60px;
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        .expert-spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(16, 185, 129, 0.3);
+            border-top-color: var(--accent-green);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }
+        .expert-progress-bar {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .expert-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan));
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+        .expert-summary-area {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+        .expert-summary-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+        .expert-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .expert-empty-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            opacity: 0.4;
+        }
+
+        /* ===== 项目工作区侧边栏 ===== */
+        .workspace-panel {
+            width: 420px;
+            background: rgba(15, 21, 35, 0.95);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .workspace-panel.collapsed {
+            width: 0;
+            border-left: none;
+            opacity: 0;
+        }
+        .workspace-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .workspace-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .workspace-header-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .workspace-header h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .workspace-header .ws-sub {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .workspace-close-btn {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .workspace-close-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+        .workspace-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            padding: 0 12px;
+        }
+        .workspace-tab {
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        .workspace-tab:hover { color: var(--text-secondary); }
+        .workspace-tab.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
+        .workspace-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .workspace-content::-webkit-scrollbar { width: 4px; }
+        .workspace-content::-webkit-scrollbar-track { background: transparent; }
+        .workspace-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* 项目卡片 */
+        .ws-project-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ws-project-card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 2px 12px rgba(59, 130, 246, 0.06);
+        }
+        .ws-project-card.selected {
+            border-color: rgba(59, 130, 246, 0.5);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.1);
+        }
+        .ws-project-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        .ws-project-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .ws-project-status {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ws-project-status.created { background: rgba(74,85,104,0.2); color: var(--text-muted); }
+        .ws-project-status.running { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+        .ws-project-status.completed { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+        .ws-project-status.failed { background: rgba(239,68,68,0.12); color: #f87171; }
+        .ws-project-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 8px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .ws-project-stats {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ws-project-stats .ws-stat {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ws-progress-bar {
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .ws-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        /* 角色工作区卡片 */
+        .ws-role-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            transition: all 0.25s;
+            cursor: pointer;
+        }
+        .ws-role-card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        .ws-role-card.running {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.12);
+            animation: expert-pulse 1.5s ease-in-out infinite;
+        }
+        .ws-role-card.done {
+            border-color: rgba(6, 182, 212, 0.3);
+        }
+        .ws-role-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .ws-role-avatar {
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: rgba(59, 130, 246, 0.15);
+        }
+        .ws-role-avatar.running { background: rgba(16, 185, 129, 0.18); }
+        .ws-role-avatar.done { background: rgba(6, 182, 212, 0.15); }
+        .ws-role-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+        .ws-role-badge {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ws-role-badge.idle { background: rgba(74,85,104,0.2); color: var(--text-muted); }
+        .ws-role-badge.working { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+        .ws-role-badge.done { background: rgba(6,182,212,0.12); color: var(--accent-cyan); }
+        .ws-role-badge.failed { background: rgba(239,68,68,0.12); color: #f87171; }
+        .ws-role-artifacts {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+        .ws-artifact-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+            border-radius: 6px;
+            background: rgba(59, 130, 246, 0.04);
+            font-size: 12px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ws-artifact-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--accent-cyan);
+        }
+        .ws-artifact-icon {
+            font-size: 12px;
+        }
+        .ws-artifact-name {
+            flex: 1;
+        }
+        .ws-artifact-size {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 产出物查看弹层 */
+        .ws-artifact-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeInUp 0.3s ease;
+        }
+        .ws-artifact-modal-content {
+            width: 720px;
+            max-width: 90vw;
+            max-height: 80vh;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .ws-artifact-modal-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .ws-artifact-modal-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .ws-artifact-modal-close {
+            padding: 5px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .ws-artifact-modal-close:hover {
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+        .ws-artifact-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .ws-artifact-modal-body .md-render {
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        .ws-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .ws-empty-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+            opacity: 0.4;
+        }
+
+        /* 项目工作区统计卡片 */
+        .ws-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .ws-stats-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .ws-stats-item .num {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-blue);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .ws-stats-item .lbl {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>
@@ -1426,6 +2404,9 @@
             <span class="status-dot"></span>
             <span>Online</span>
         </div>
+        <button class="btn-icon" id="btnSkills">🔧 技能</button>
+        <button class="btn-icon" id="btnExpertPanel">🤝 专家团</button>
+        <button class="btn-icon" id="btnWorkspace">📁 工作区</button>
         <button class="btn-icon" id="btnCronJob">⏰ 定时任务</button>
         <button class="btn-icon" id="btnMemory">🧠 记忆</button>
         <button class="btn-icon" id="btnReset">↻ 重置</button>
@@ -1459,6 +2440,7 @@
            <strong style="color:var(--accent-purple)">Plan</strong> 规划执行 ·
            <strong style="color:var(--accent-amber)">Reflect</strong> 深度反思</p>
         <div class="hint-tags">
+            <div class="hint-tag" data-q="帮我分析一个外卖App项目的全流程方案">🤝 专家团</div>
             <div class="hint-tag" data-q="今天北京天气怎么样？">天气查询</div>
             <div class="hint-tag" data-q="帮我制定一个学习Java的30天计划">制定计划</div>
             <div class="hint-tag" data-q="请写一首关于春天的现代诗">诗歌创作</div>
@@ -1468,6 +2450,9 @@
 </div>
 
 <!-- 输入区域 -->
+<div class="stop-bar" id="stopBar">
+    <button class="btn-stop" id="btnStop">停止生成</button>
+</div>
 <div class="input-area">
     <div class="input-wrapper">
         <textarea id="userInput" placeholder="输入问题，我将自动选择最佳模式... (Enter 发送)" rows="1"></textarea>
@@ -1476,6 +2461,27 @@
 </div>
 
 </div><!-- 聊天区域结束 -->
+
+<!-- 技能侧边栏 -->
+<div class="skills-panel collapsed" id="skillsPanel">
+    <div class="skills-header">
+        <div class="skills-header-left">
+            <div class="skills-header-icon">🔧</div>
+            <div>
+                <h3>技能中心</h3>
+                <span class="skills-sub" id="skillsSub">管理 · 安装 · 启用</span>
+            </div>
+        </div>
+        <button class="skills-close-btn" id="btnSkillsClose">✕</button>
+    </div>
+    <div class="skills-tabs">
+        <div class="skills-tab active" data-stab="installed">已安装</div>
+        <div class="skills-tab" data-stab="install">安装技能</div>
+    </div>
+    <div class="skills-content" id="skillsContent">
+        <!-- 内容由 JS 动态渲染 -->
+    </div>
+</div>
 
 <!-- 定时任务侧边栏 -->
 <div class="cronjob-panel collapsed" id="cronjobPanel">
@@ -1495,6 +2501,51 @@
             <p>暂无定时任务</p>
             <p style="margin-top:6px;font-size:11px;">试试发送：每天早上9点提醒我查看邮件</p>
         </div>
+    </div>
+</div>
+
+<!-- 专家团侧边栏 -->
+<div class="expert-panel collapsed" id="expertPanel">
+    <div class="expert-panel-header">
+        <div class="expert-panel-header-left">
+            <div class="expert-panel-header-icon">🤝</div>
+            <div>
+                <h3>专家团协作</h3>
+                <span class="expert-sub" id="expertSub">正在等待任务...</span>
+            </div>
+        </div>
+        <button class="expert-close-btn" id="btnExpertClose">✕</button>
+    </div>
+    <div class="expert-agents-list" id="expertAgentsList">
+        <div class="expert-empty" id="expertEmpty">
+            <div class="expert-empty-icon">🤝</div>
+            <p>输入需求后将自动开始协作</p>
+            <p style="margin-top:6px;font-size:11px;">多个专家角色并行分析，输出完整方案</p>
+        </div>
+    </div>
+    <div class="expert-progress-bar" id="expertProgressBar" style="display:none;margin:0 12px 8px;">
+        <div class="expert-progress-fill" id="expertProgressFill" style="width:0%"></div>
+    </div>
+</div>
+
+<!-- 项目工作区侧边栏 -->
+<div class="workspace-panel collapsed" id="workspacePanel">
+    <div class="workspace-header">
+        <div class="workspace-header-left">
+            <div class="workspace-header-icon">📁</div>
+            <div>
+                <h3>项目工作区</h3>
+                <span class="ws-sub" id="wsSub">按项目划分 · 角色私有</span>
+            </div>
+        </div>
+        <button class="workspace-close-btn" id="btnWsClose">✕</button>
+    </div>
+    <div class="workspace-tabs">
+        <div class="workspace-tab active" data-wstab="projects">项目列表</div>
+        <div class="workspace-tab" data-wstab="current">当前项目</div>
+    </div>
+    <div class="workspace-content" id="workspaceContent">
+        <!-- 内容由 JS 动态渲染 -->
     </div>
 </div>
 
@@ -1527,6 +2578,8 @@
     let sessionId = null;
     let isLoading = false;
     let lastMode = null;
+    let currentAbortController = null;
+    let currentReader = null;
 
     // ========== Markdown 渲染配置 ==========
 
@@ -1542,6 +2595,105 @@
             return code;
         }
     });
+
+    // ========== 打字机引擎 ==========
+    const TypewriterEngine = {
+        buffer: '',           // 累积的全部文本
+        revealPos: 0,        // 已揭示的字符位置
+        timerId: null,        // 定时器ID
+        isActive: false,      // 是否正在运行
+        renderCallback: null, // 渲染回调 (revealedText, isFinal)
+        completeCallback: null,// 全部揭示完成回调
+        isAccelerating: false,// 加速模式（done事件后）
+        lastRenderTime: 0,    // 上次渲染时间戳
+        pendingDoneData: null,// 等待处理的done数据
+
+        // 配置参数
+        CHAR_DELAY_MS: 28,    // 每字符间隔 ~36字符/秒，匹配人眼阅读速度
+        RENDER_THROTTLE: 70,  // Markdown渲染节流间隔(ms)
+        ACCEL_CHARS: 6,       // 加速模式每次推进字符数
+
+        /** 启动打字机 */
+        start(renderCb, completeCb) {
+            this.buffer = '';
+            this.revealPos = 0;
+            this.isActive = true;
+            this.isAccelerating = false;
+            this.lastRenderTime = 0;
+            this.pendingDoneData = null;
+            this.renderCallback = renderCb;
+            this.completeCallback = completeCb;
+
+            const tick = () => {
+                if (!this.isActive) return;
+
+                const advance = this.isAccelerating ? this.ACCEL_CHARS : 1;
+                if (this.revealPos < this.buffer.length) {
+                    this.revealPos = Math.min(this.revealPos + advance, this.buffer.length);
+
+                    const now = performance.now();
+                    // 节流：避免过于频繁的DOM更新
+                    if (now - this.lastRenderTime >= this.RENDER_THROTTLE || this.revealPos >= this.buffer.length) {
+                        this.lastRenderTime = now;
+                        const revealedText = this.buffer.substring(0, this.revealPos);
+                        if (this.renderCallback) this.renderCallback(revealedText, false);
+                    }
+                } else if (this.isAccelerating) {
+                    // 加速模式下所有文本已揭示完毕
+                    this.finish();
+                    return;
+                }
+            };
+
+            this.timerId = setInterval(tick, this.CHAR_DELAY_MS);
+        },
+
+        /** 推入新的文本块 */
+        push(text) {
+            this.buffer += text;
+        },
+
+        /** 加速：done事件后触发 */
+        accelerate(doneData) {
+            this.pendingDoneData = doneData;
+            // 如果buffer为空（无answer_chunk），直接完成
+            if (this.buffer.length === 0) {
+                this.finish();
+                return;
+            }
+            this.isAccelerating = true;
+        },
+
+        /** 立即刷新所有文本 */
+        flush() {
+            this.revealPos = this.buffer.length;
+            if (this.buffer.length > 0 && this.renderCallback) {
+                this.renderCallback(this.buffer, true);
+            }
+            this.finish();
+        },
+
+        /** 完成并清理 */
+        finish() {
+            this.isActive = false;
+            if (this.timerId) {
+                clearInterval(this.timerId);
+                this.timerId = null;
+            }
+            if (this.completeCallback) {
+                this.completeCallback(this.buffer, this.pendingDoneData);
+            }
+        },
+
+        /** 停止（不触发回调） */
+        stop() {
+            this.isActive = false;
+            if (this.timerId) {
+                clearInterval(this.timerId);
+                this.timerId = null;
+            }
+        }
+    };
 
     /** 渲染 Markdown 文本 */
     function renderMarkdown(text) {
@@ -1615,6 +2767,8 @@
     const welcome = document.getElementById('welcome');
     const userInput = document.getElementById('userInput');
     const btnSend = document.getElementById('btnSend');
+    const btnStop = document.getElementById('btnStop');
+    const stopBar = document.getElementById('stopBar');
     const btnReset = document.getElementById('btnReset');
     const modeBadge = document.getElementById('modeBadge');
     const modeIcon = document.getElementById('modeIcon');
@@ -1763,7 +2917,13 @@
             executing:   { icon: '▶️', label: 'EXEC' },
             reflecting:  { icon: '🔄', label: 'REFLECT' },
             refining:    { icon: '✏️', label: 'REFINE' },
-            summary:     { icon: '✅', label: 'SUMMARY' }
+            summary:     { icon: '\u2705', label: 'SUMMARY' },
+            expert_dispatch:    { icon: '\u{1F680}', label: 'DISPATCH' },
+            expert_result:      { icon: '\u{1F4CB}', label: 'RESULT' },
+            expert_collaborate: { icon: '\u{1F91D}', label: 'COLLAB' },
+            expert_decline:     { icon: '\u{1F6AB}', label: 'DECLINE' },
+            expert_bounce:      { icon: '\u{1F504}', label: 'BOUNCE' },
+            chat:               { icon: '\u{1F4AC}', label: 'CHAT' }
         };
 
         const panel = document.createElement('div');
@@ -1866,17 +3026,283 @@
         userInput.disabled = loading;
         if (loading) {
             btnSend.innerHTML = '<span class="spinner"></span>思考中';
+            stopBar.classList.add('visible');
         } else {
             btnSend.textContent = '发送';
+            stopBar.classList.remove('visible');
             userInput.focus();
         }
     }
 
+    function stopGeneration() {
+        // 停止打字机（不触发回调，由后续 finalizeStreamingMessage 处理）
+        if (TypewriterEngine.isActive) {
+            TypewriterEngine.stop();
+        }
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        if (currentReader) {
+            try { currentReader.cancel(); } catch(e) {}
+            currentReader = null;
+        }
+        setLoading(false);
+    }
+
+    /** 在气泡末尾添加打字光标 */
+    function appendTypingCursor(bubble) {
+        // 移除已有光标
+        const existing = bubble.querySelector('.tw-cursor');
+        if (existing) existing.remove();
+        // 找到最后一个文本节点或元素节点，追加光标
+        const cursor = document.createElement('span');
+        cursor.className = 'tw-cursor';
+        // 如果最后一个子节点是文本节点，追加在其后
+        // 否则追加到气泡末尾
+        if (bubble.lastChild) {
+            bubble.lastChild.appendChild
+                ? bubble.lastChild.appendChild(cursor)
+                : bubble.appendChild(cursor);
+        } else {
+            bubble.appendChild(cursor);
+        }
+    }
+
+    /** 移除打字光标 */
+    function removeTypingCursor(bubble) {
+        if (!bubble) return;
+        const cursor = bubble.querySelector('.tw-cursor');
+        if (cursor) cursor.remove();
+    }
+
     // ========== 核心逻辑 ==========
+
+    /** 创建空的 assistant 消息气泡（流式输出用） */
+    function createStreamingMessage() {
+        if (welcome) welcome.style.display = 'none';
+
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'message assistant';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'msg-avatar';
+        avatar.textContent = '⚡';
+
+        const body = document.createElement('div');
+        body.className = 'msg-body';
+
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta';
+        const modeTagEl = document.createElement('span');
+        modeTagEl.className = 'msg-mode-tag';
+        modeTagEl.style.display = 'none';
+        meta.appendChild(modeTagEl);
+        const time = document.createElement('span');
+        time.textContent = getTimeStr();
+        meta.appendChild(time);
+        body.appendChild(meta);
+
+        // 思考步骤容器（实时追加）
+        const thinkContainer = document.createElement('div');
+        thinkContainer.className = 'stream-think-container';
+        body.appendChild(thinkContainer);
+
+        // 打字机正在思考指示器
+        const thinkingDot = document.createElement('div');
+        thinkingDot.id = 'streamThinkingDot';
+        thinkingDot.className = 'routing-indicator';
+        thinkingDot.style.marginTop = '6px';
+        thinkingDot.innerHTML = '<div class="routing-spinner"></div><span>正在思考中...</span>';
+        body.appendChild(thinkingDot);
+
+        // 气泡（最终答案的展示位置）
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble md-render';
+        bubble.style.display = 'none';
+        body.appendChild(bubble);
+
+        // 统计信息条
+        const stats = document.createElement('div');
+        stats.className = 'msg-stats';
+        stats.style.display = 'none';
+        body.appendChild(stats);
+
+        msgDiv.appendChild(avatar);
+        msgDiv.appendChild(body);
+        chatContainer.appendChild(msgDiv);
+        scrollToBottom();
+
+        return { msgDiv, body, thinkContainer, thinkingDot, bubble, stats, modeTagEl };
+    }
+
+    /** 向流式消息追加一个 ThinkStep 卡片 */
+    function appendStreamThinkStep(thinkContainer, step) {
+        const STEP_META = {
+            routing:     { icon: '🧠', label: 'ROUTING' },
+            thought:     { icon: '💡', label: 'THOUGHT' },
+            action:      { icon: '⚡', label: 'ACTION' },
+            observation: { icon: '🔬', label: 'OBS' },
+            planning:    { icon: '🗺', label: 'PLAN' },
+            executing:   { icon: '▶️', label: 'EXEC' },
+            reflecting:  { icon: '🔄', label: 'REFLECT' },
+            refining:    { icon: '✏️', label: 'REFINE' },
+            summary:     { icon: '\u2705', label: 'SUMMARY' },
+            expert_dispatch:    { icon: '\u{1F680}', label: 'DISPATCH' },
+            expert_result:      { icon: '\u{1F4CB}', label: 'RESULT' },
+            expert_collaborate: { icon: '\u{1F91D}', label: 'COLLAB' },
+            expert_decline:     { icon: '\u{1F6AB}', label: 'DECLINE' },
+            expert_bounce:      { icon: '\u{1F504}', label: 'BOUNCE' },
+            chat:               { icon: '\u{1F4AC}', label: 'CHAT' }
+        };
+        const meta = STEP_META[step.type] || { icon: '•', label: step.type.toUpperCase() };
+
+        // 如果还没有 think-panel，先创建它
+        let panel = thinkContainer.querySelector('.think-panel');
+        let stepsEl;
+        let toggleCountEl;
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.className = 'think-panel';
+
+            const toggle = document.createElement('div');
+            toggle.className = 'think-toggle open';
+            toggle.innerHTML = '<span class="toggle-arrow" style="transform:rotate(90deg)">▶</span>'
+                + '<span>🧠 思考过程</span>'
+                + '<span id="streamStepCount" style="margin-left:4px;color:var(--text-muted)">0 步</span>';
+
+            stepsEl = document.createElement('div');
+            stepsEl.className = 'think-steps visible';
+
+            toggle.addEventListener('click', function() {
+                const open = stepsEl.classList.toggle('visible');
+                toggle.classList.toggle('open', open);
+                const arrow = toggle.querySelector('.toggle-arrow');
+                if (arrow) arrow.style.transform = open ? 'rotate(90deg)' : '';
+            });
+
+            panel.appendChild(toggle);
+            panel.appendChild(stepsEl);
+            thinkContainer.appendChild(panel);
+        } else {
+            stepsEl = panel.querySelector('.think-steps');
+            toggleCountEl = panel.querySelector('#streamStepCount');
+        }
+
+        // 更新步数
+        const countEl = panel.querySelector('#streamStepCount');
+        const currentCount = stepsEl.children.length + 1;
+        if (countEl) countEl.textContent = currentCount + ' 步';
+
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'think-step';
+
+        const iconEl = document.createElement('div');
+        iconEl.className = 'step-icon ' + step.type;
+        iconEl.textContent = meta.icon;
+
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'step-body';
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'step-title ' + step.type;
+        titleEl.textContent = '[' + meta.label + '] ' + (step.title || '');
+
+        const contentEl = document.createElement('div');
+        contentEl.className = 'step-content';
+        contentEl.textContent = step.content || '';
+
+        bodyEl.appendChild(titleEl);
+        bodyEl.appendChild(contentEl);
+        stepDiv.appendChild(iconEl);
+        stepDiv.appendChild(bodyEl);
+        stepsEl.appendChild(stepDiv);
+        scrollToBottom();
+    }
+
+    /** 流式完成：展示最终答案，隐藏思考指示器 */
+    function finalizeStreamingMessage(parts, data, answerBuffer) {
+        answerBuffer = answerBuffer || '';
+        const { thinkingDot, bubble, stats, modeTagEl, thinkContainer } = parts;
+
+        // 隐藏正在思考提示
+        thinkingDot.style.display = 'none';
+
+        // 收起思考面板
+        if (thinkContainer.querySelector('.think-panel')) {
+            const stepsEl = thinkContainer.querySelector('.think-steps');
+            if (stepsEl) stepsEl.classList.remove('visible');
+            const toggle = thinkContainer.querySelector('.think-toggle');
+            if (toggle) toggle.classList.remove('open');
+        }
+
+        // 更新模式标签
+        if (data.mode) {
+            const modeMap = {
+                'chat':              { text: 'CHAT', cls: 'chat' },
+                'react':            { text: 'REACT', cls: 'react' },
+                'plan_and_execute': { text: 'PLAN&EXEC', cls: 'plan_and_execute' },
+                'reflection':       { text: 'REFLECT', cls: 'reflection' },
+                'cronjob':          { text: 'CRONJOB', cls: 'cronjob' },
+                'expert_panel':     { text: 'EXPERT', cls: 'expert_panel' }
+            };
+            const m = modeMap[data.mode] || modeMap['chat'];
+            modeTagEl.className = 'msg-mode-tag ' + m.cls;
+            modeTagEl.textContent = m.text;
+            modeTagEl.style.display = '';
+        }
+
+        // 打字机效果展示答案
+        bubble.style.display = '';
+        if (data.success) {
+            bubble.innerHTML = renderMarkdown(data.answer || '');
+            addCopyButtons(bubble);
+        } else {
+            bubble.classList.add('error');
+            bubble.classList.remove('md-render');
+            bubble.textContent = data.error || '未知错误';
+        }
+
+        // 统计信息
+        if (data.durationMs || data.totalTokens) {
+            stats.style.display = '';
+            if (data.cached) {
+                const cachedTag = document.createElement('span');
+                cachedTag.className = 'cached-tag';
+                cachedTag.textContent = 'CACHED';
+                stats.appendChild(cachedTag);
+            }
+            if (data.durationMs !== undefined) {
+                const durationSec = data.durationMs < 1000
+                    ? data.durationMs + 'ms'
+                    : (data.durationMs / 1000).toFixed(1) + 's';
+                const dItem = document.createElement('span');
+                dItem.className = 'stat-item';
+                dItem.innerHTML = '<span class="stat-icon">⏱</span><span class="stat-value">' + durationSec + '</span>';
+                stats.appendChild(dItem);
+            }
+            if (data.totalTokens !== undefined && data.totalTokens > 0) {
+                const tItem = document.createElement('span');
+                tItem.className = 'stat-item';
+                tItem.innerHTML = '<span class="stat-icon">⚡</span><span class="stat-value">' + data.totalTokens + ' tokens</span>';
+                stats.appendChild(tItem);
+            }
+        }
+
+        scrollToBottom();
+    }
 
     async function sendMessage() {
         const message = userInput.value.trim();
         if (!message || isLoading) return;
+
+        // 命令拦截：/new 新开会话
+        if (message === '/new') {
+            userInput.value = '';
+            autoResize(userInput);
+            resetSession();
+            return;
+        }
 
         appendMessage('user', message);
         userInput.value = '';
@@ -1885,14 +3311,23 @@
         setLoading(true);
         appendRoutingIndicator();
 
-        try {
-            const body = { message: message };
-            if (sessionId) body.sessionId = sessionId;
+        // 创建流式消息占位元素
+        let streamParts = null;
+        let answerBuffer = ''; // 累积收到的 answer_chunk
+        let doneReceived = false; // 是否已收到done事件
 
-            const response = await fetch('/api/chat', {
+        // 创建 AbortController 用于取消请求
+        currentAbortController = new AbortController();
+
+        try {
+            const bodyObj = { message: message };
+            if (sessionId) bodyObj.sessionId = sessionId;
+
+            const response = await fetch('/api/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
+                body: JSON.stringify(bodyObj),
+                signal: currentAbortController.signal
             });
 
             removeRoutingIndicator();
@@ -1901,40 +3336,130 @@
                 throw new Error('HTTP ' + response.status);
             }
 
-            const data = await response.json();
+            // 创建流式消息容器
+            streamParts = createStreamingMessage();
 
-            // 更新 sessionId
-            if (data.sessionId) {
-                sessionId = data.sessionId;
-                sessionTag.textContent = 'SID:' + sessionId.substring(0, 8);
-            }
+            // 读取 SSE 流
+            const reader = response.body.getReader();
+            currentReader = reader;
+            const decoder = new TextDecoder();
+            let buffer = '';
+            // eventName 必须在 while 循环外声明，跨 chunk 保持事件名
+            let eventName = '';
 
-            // 更新模式徽章
-            if (data.mode) {
-                updateModeBadge(data.mode);
-            }
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-            if (data.success) {
-                appendMessage('assistant', data.answer, {
-                    mode: data.mode,
-                    thinkSteps: data.thinkSteps,
-                    durationMs: data.durationMs,
-                    totalTokens: data.totalTokens,
-                    cached: data.cached
-                });
-            } else {
-                appendMessage('assistant', data.error || '未知错误', {
-                    isError: true,
-                    thinkSteps: data.thinkSteps,
-                    durationMs: data.durationMs,
-                    totalTokens: data.totalTokens
-                });
+                buffer += decoder.decode(value, { stream: true });
+
+                // 按行处理 SSE 数据
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // 保留未完成的行
+
+                for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        eventName = line.slice(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        const dataStr = line.slice(5).trim();
+                        if (!dataStr) continue;
+
+                        if (eventName === 'answer_chunk') {
+                            // 流式答案块：推入打字机引擎
+                            answerBuffer += dataStr;
+                            TypewriterEngine.push(dataStr);
+                            streamParts.thinkingDot.style.display = 'none';
+                            streamParts.bubble.style.display = '';
+
+                            // 首次收到文本时启动打字机
+                            if (!TypewriterEngine.isActive) {
+                                TypewriterEngine.start(
+                                    (revealedText, isFinal) => {
+                                        // 渲染已揭示的文本
+                                        streamParts.bubble.innerHTML = renderMarkdown(revealedText);
+                                        // 添加打字光标
+                                        if (!isFinal) appendTypingCursor(streamParts.bubble);
+                                        scrollToBottom();
+                                    },
+                                    (fullText, doneData) => {
+                                        // 打字机完成：执行最终渲染
+                                        if (doneData) {
+                                            finalizeStreamingMessage(streamParts, doneData, fullText);
+                                        } else if (fullText) {
+                                            streamParts.bubble.innerHTML = renderMarkdown(fullText);
+                                            addCopyButtons(streamParts.bubble);
+                                        }
+                                        scrollToBottom();
+                                    }
+                                );
+                            }
+                            eventName = '';
+                            continue;
+                        }
+
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            if (eventName === 'think_step') {
+                                appendStreamThinkStep(streamParts.thinkContainer, parsed);
+                            } else if (eventName === 'done') {
+                                // 更新 sessionId
+                                if (parsed.sessionId) {
+                                    sessionId = parsed.sessionId;
+                                    sessionTag.textContent = 'SID:' + sessionId.substring(0, 8);
+                                }
+                                // 更新模式徽章
+                                if (parsed.mode) updateModeBadge(parsed.mode);
+
+                                if (TypewriterEngine.isActive && answerBuffer.length > 0) {
+                                    // 打字机正在运行，加速完成
+                                    doneReceived = true;
+                                    TypewriterEngine.accelerate(parsed);
+                                } else {
+                                    // 无流式文本（如错误场景），直接最终渲染
+                                    doneReceived = true;
+                                    finalizeStreamingMessage(streamParts, parsed, answerBuffer);
+                                }
+                            }
+                        } catch (parseErr) {
+                            console.warn('SSE 解析失败:', parseErr, '事件:', eventName, '原始数据:', dataStr);
+                        }
+                        eventName = '';
+                    } else if (line === '') {
+                        // SSE 事件分隔符（空行），重置事件名
+                        eventName = '';
+                    }
+                }
             }
 
         } catch (err) {
             removeRoutingIndicator();
-            appendMessage('assistant', '请求失败: ' + err.message, { isError: true });
+            if (err.name === 'AbortError') {
+                // 用户主动停止：停止打字机并显示停止提示
+                TypewriterEngine.stop();
+                if (streamParts) {
+                    const stopMsg = answerBuffer
+                        ? answerBuffer + '\n\n---\n*已停止生成*'
+                        : '*已停止生成*';
+                    finalizeStreamingMessage(streamParts, { success: true, answer: stopMsg, mode: lastMode }, '');
+                }
+            } else if (streamParts) {
+                // 如果已创建流式容器，直接在其中显示错误
+                finalizeStreamingMessage(streamParts, { success: false, error: '请求失败: ' + err.message });
+            } else {
+                appendMessage('assistant', '请求失败: ' + err.message, { isError: true });
+            }
         } finally {
+            // 安全网：如果done事件未收到但打字机还在运行，强制结束
+            if (!doneReceived && TypewriterEngine.isActive) {
+                if (answerBuffer.length > 0) {
+                    TypewriterEngine.flush();
+                    finalizeStreamingMessage(streamParts, { success: true, answer: answerBuffer, mode: lastMode }, '');
+                } else {
+                    TypewriterEngine.stop();
+                }
+            }
+            currentAbortController = null;
+            currentReader = null;
             setLoading(false);
         }
     }
@@ -1975,6 +3500,7 @@
     // ========== 事件绑定 ==========
 
     btnSend.addEventListener('click', sendMessage);
+    btnStop.addEventListener('click', stopGeneration);
 
     userInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -2329,14 +3855,655 @@
     btnMemClose.addEventListener('click', toggleMemoryPanel);
 
     // 当聊天创建cronjob成功后自动刷新列表
-    const _originalSendMessage = sendMessage;
-    sendMessage = function() {
-        const result = _originalSendMessage();
-        // 如果面板打开，延迟刷新列表
-        if (cronPanelVisible && result && typeof result.then === 'function') {
-            result.then(() => setTimeout(loadCronJobs, 1000));
+    // ========== 专家团功能 ==========
+
+    const btnExpertPanelBtn = document.getElementById('btnExpertPanel');
+    const btnExpertClose  = document.getElementById('btnExpertClose');
+    const expertPanel     = document.getElementById('expertPanel');
+    const expertAgentsList = document.getElementById('expertAgentsList');
+    const expertEmpty     = document.getElementById('expertEmpty');
+    const expertSub       = document.getElementById('expertSub');
+    const expertProgressBar  = document.getElementById('expertProgressBar');
+    const expertProgressFill = document.getElementById('expertProgressFill');
+    let expertPanelVisible = false;
+
+    const EXPERT_ROLES = {
+        'sales':      { name: '销售顾问',   emoji: '💼' },
+        'pm':         { name: '产品经理',   emoji: '📝' },
+        'architect':  { name: '架构师',     emoji: '🏗️' },
+        'developer':  { name: '开发工程师',   emoji: '💻' },
+        'tester':     { name: '测试工程师',   emoji: '🔍' },
+        'pm_project': { name: '项目经理',   emoji: '📊' }
+    };
+    const ROLE_ORDER = ['sales', 'pm', 'architect', 'developer', 'tester', 'pm_project'];
+
+    function toggleExpertPanel() {
+        expertPanelVisible = !expertPanelVisible;
+        if (expertPanelVisible) {
+            if (cronPanelVisible) toggleCronPanel();
+            if (memPanelVisible) toggleMemoryPanel();
+            expertPanel.classList.remove('collapsed');
+        } else {
+            expertPanel.classList.add('collapsed');
+        }
+    }
+
+    function initExpertCards() {
+        expertEmpty.style.display = 'none';
+        expertProgressBar.style.display = 'block';
+        expertProgressFill.style.width = '0%';
+        expertSub.textContent = '正在分析需求...';
+        const oldCards = expertAgentsList.querySelectorAll('.expert-agent-card');
+        oldCards.forEach(c => c.remove());
+        ROLE_ORDER.forEach(role => {
+            const info = EXPERT_ROLES[role] || { name: role, emoji: '👤' };
+            const card = document.createElement('div');
+            card.className = 'expert-agent-card pending';
+            card.id = 'expert-card-' + role;
+            card.innerHTML = '<div class="expert-agent-card-header">'
+                + '<div class="expert-agent-avatar pending">' + info.emoji + '</div>'
+                + '<span class="expert-agent-name">' + info.name + '</span>'
+                + '<span class="expert-agent-status-badge pending">等待中</span>'
+                + '</div>'
+                + '<div class="expert-agent-preview">等待执行...</div>';
+            expertAgentsList.appendChild(card);
+        });
+    }
+
+    function updateExpertCard(role, status, preview) {
+        const card = document.getElementById('expert-card-' + role);
+        if (!card) return;
+        const info = EXPERT_ROLES[role] || { name: role, emoji: '👤' };
+        const statusLabel = { pending: '等待中', running: '执行中...', done: '已完成' }[status] || '等待中';
+        card.className = 'expert-agent-card ' + status;
+        card.innerHTML = '<div class="expert-agent-card-header">'
+            + '<div class="expert-agent-avatar ' + status + '">' + info.emoji + '</div>'
+            + '<span class="expert-agent-name">' + info.name + '</span>'
+            + (status === 'running' ? '<div class="expert-spinner"></div>' : '')
+            + '<span class="expert-agent-status-badge ' + status + '">' + statusLabel + '</span>'
+            + '</div>'
+            + '<div class="expert-agent-preview">' + escapeHtml((preview || '').substring(0, 100)) + '</div>';
+    }
+
+    function syncExpertCardsFromSteps(steps) {
+        if (!steps || steps.length === 0) return;
+        let doneCount = 0;
+        const dispatched = new Set();
+        const done = new Set();
+        const previews = {};
+        steps.forEach(step => {
+            if (!step || !step.type) return;
+            const type = step.type.toLowerCase();
+            const title = step.title || '';
+            ROLE_ORDER.forEach(role => {
+                const info = EXPERT_ROLES[role];
+                if (!info) return;
+                if (type === 'expert_dispatch' && title.includes(info.name)) dispatched.add(role);
+                if (type === 'expert_result'   && title.includes(info.name)) {
+                    done.add(role);
+                    previews[role] = (step.content || '').substring(0, 100) + '...';
+                }
+            });
+        });
+        doneCount = done.size;
+        ROLE_ORDER.forEach(role => {
+            if (done.has(role))       updateExpertCard(role, 'done', previews[role]);
+            else if (dispatched.has(role)) updateExpertCard(role, 'running', '正在分析...');
+        });
+        expertProgressFill.style.width = Math.round(doneCount / ROLE_ORDER.length * 100) + '%';
+        expertSub.textContent = doneCount + ' / ' + ROLE_ORDER.length + ' 专家已完成';
+    }
+
+    btnExpertPanelBtn.addEventListener('click', function() { if (!expertPanelVisible) toggleExpertPanel(); });
+    btnExpertClose.addEventListener('click', toggleExpertPanel);
+
+    const _origAppendMsg = appendMessage;
+    appendMessage = function(role, content, opts) {
+        const result = _origAppendMsg(role, content, opts);
+        if (expertPanelVisible && role === 'assistant' && opts && opts.thinkSteps) {
+            syncExpertCardsFromSteps(opts.thinkSteps);
+            if (opts.mode === 'expert_panel') {
+                expertSub.textContent = '全部专家已完成 ✔';
+                expertProgressFill.style.width = '100%';
+            }
+        }
+        // 工作区：捕获 projectId
+        if (role === 'assistant' && opts && opts.projectId) {
+            currentProjectId = opts.projectId;
+            if (wsPanelVisible) loadWorkspaceTab('current');
+        }
+        return result;
+    };
+
+    const _origSendMsg = sendMessage;
+    sendMessage = async function() {
+        if (expertPanelVisible) initExpertCards();
+        const result = await _origSendMsg();
+        if (cronPanelVisible) setTimeout(loadCronJobs, 1000);
+        return result;
+    };
+
+    const _origReset = resetSession;
+    resetSession = function() {
+        _origReset();
+        const oldCards = expertAgentsList.querySelectorAll('.expert-agent-card');
+        oldCards.forEach(c => c.remove());
+        expertEmpty.style.display = 'block';
+        expertProgressBar.style.display = 'none';
+        expertSub.textContent = '正在等待任务...';
+        // 重置当前工作区ID
+        currentProjectId = null;
+    };
+
+    // ========== 项目工作区功能 ==========
+
+    const btnWorkspace = document.getElementById('btnWorkspace');
+    const btnWsClose = document.getElementById('btnWsClose');
+    const workspacePanel = document.getElementById('workspacePanel');
+    const workspaceContent = document.getElementById('workspaceContent');
+    const wsSub = document.getElementById('wsSub');
+    let wsPanelVisible = false;
+    let wsCurrentTab = 'projects';
+    let currentProjectId = null;
+    let wsRefreshTimer = null;
+
+    /** 角色产出物类型图标 */
+    const ARTIFACT_ICONS = {
+        'document': '📄', 'code': '💻', 'design': '🏗️',
+        'plan': '📊', 'test_case': '🔍', 'analysis': '📈', 'other': '📎'
+    };
+
+    /** 角色元数据 */
+    const WS_ROLE_META = {
+        'sales':      { name: '销售分析师',   emoji: '💼' },
+        'pm':         { name: '产品经理',   emoji: '📝' },
+        'architect':  { name: '架构师',     emoji: '🏗️' },
+        'developer':  { name: '开发工程师',   emoji: '💻' },
+        'tester':     { name: '测试工程师',   emoji: '🔍' },
+        'pm_project': { name: '项目经理',   emoji: '📊' }
+    };
+
+    function toggleWorkspacePanel() {
+        wsPanelVisible = !wsPanelVisible;
+        if (wsPanelVisible) {
+            // 关闭其他面板
+            if (cronPanelVisible) toggleCronPanel();
+            if (memPanelVisible) toggleMemoryPanel();
+            if (expertPanelVisible) toggleExpertPanel();
+            workspacePanel.classList.remove('collapsed');
+            loadWorkspaceTab(wsCurrentTab);
+            // 自动刷新
+            wsRefreshTimer = setInterval(() => loadWorkspaceTab(wsCurrentTab), 8000);
+        } else {
+            workspacePanel.classList.add('collapsed');
+            if (wsRefreshTimer) {
+                clearInterval(wsRefreshTimer);
+                wsRefreshTimer = null;
+            }
+        }
+    }
+
+    // 工作区 Tab 点击
+    document.querySelectorAll('.workspace-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.workspace-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            wsCurrentTab = this.dataset.wstab;
+            loadWorkspaceTab(wsCurrentTab);
+        });
+    });
+
+    async function loadWorkspaceTab(tab) {
+        workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">⏳</div><p>加载中...</p></div>';
+        try {
+            if (tab === 'projects') {
+                await loadProjectList();
+            } else if (tab === 'current') {
+                if (currentProjectId) {
+                    await loadProjectDetail(currentProjectId);
+                } else {
+                    workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">📁</div><p>暂无当前项目</p><p style="margin-top:6px;font-size:11px;">使用专家团模式时自动创建</p></div>';
+                }
+            }
+        } catch (e) {
+            workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">❌</div><p>加载失败</p></div>';
+            console.error('加载工作区失败:', e);
+        }
+    }
+
+    async function loadProjectList() {
+        try {
+            const resp = await fetch('/api/workspace/list');
+            const data = await resp.json();
+            if (data.success) {
+                renderProjectList(data.workspaces || []);
+                wsSub.textContent = (data.total || 0) + ' 个项目';
+            }
+        } catch (e) {
+            console.error('加载项目列表失败:', e);
+        }
+    }
+
+    function renderProjectList(projects) {
+        if (!projects || projects.length === 0) {
+            workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">📁</div><p>暂无项目</p><p style="margin-top:6px;font-size:11px;">使用专家团模式分析需求时自动创建项目</p></div>';
+            return;
+        }
+
+        let html = '';
+        projects.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        projects.forEach(proj => {
+            const statusCls = proj.status || 'created';
+            const statusLabel = {created: '待启动', running: '执行中', completed: '已完成', failed: '失败'}[statusCls] || statusCls;
+            const progress = proj.progressPercent || 0;
+            const createTime = formatTime(proj.createdAt);
+
+            html += '<div class="ws-project-card' + (proj.id === currentProjectId ? ' selected' : '') + '" onclick="selectProject(\'' + proj.id + '\')">'
+                + '<div class="ws-project-header">'
+                + '<div class="ws-project-name">📁 ' + escapeHtml(proj.name || '未命名项目') + '</div>'
+                + '<span class="ws-project-status ' + statusCls + '">' + statusLabel + '</span>'
+                + '</div>'
+                + '<div class="ws-project-desc">' + escapeHtml((proj.description || '').substring(0, 100)) + '</div>'
+                + '<div class="ws-project-stats">'
+                + '<span class="ws-stat">📊 ' + (proj.totalArtifacts || 0) + ' 产出</span>'
+                + '<span class="ws-stat">⚡ ' + (proj.totalTokens || 0) + ' tokens</span>'
+                + '<span class="ws-stat">🕐 ' + createTime + '</span>'
+                + '</div>'
+                + '<div class="ws-progress-bar"><div class="ws-progress-fill" style="width:' + progress + '%"></div></div>'
+                + '</div>';
+        });
+        workspaceContent.innerHTML = html;
+    }
+
+    async function selectProject(projectId) {
+        currentProjectId = projectId;
+        // 切换到当前项目 tab
+        wsCurrentTab = 'current';
+        document.querySelectorAll('.workspace-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.wstab === 'current');
+        });
+        await loadProjectDetail(projectId);
+    }
+
+    async function loadProjectDetail(projectId) {
+        try {
+            const resp = await fetch('/api/workspace/' + projectId);
+            const data = await resp.json();
+            if (data.success) {
+                renderProjectDetail(data);
+            } else {
+                workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">❌</div><p>' + (data.error || '加载失败') + '</p></div>';
+            }
+        } catch (e) {
+            workspaceContent.innerHTML = '<div class="ws-empty"><div class="ws-empty-icon">❌</div><p>加载失败</p></div>';
+        }
+    }
+
+    function renderProjectDetail(data) {
+        let html = '';
+
+        // 统计卡片
+        const stats = data.stats || {};
+        html += '<div class="ws-stats-grid">'
+            + '<div class="ws-stats-item"><div class="num">' + (stats.doneRoles || 0) + '/' + (stats.totalRoles || 0) + '</div><div class="lbl">已完成角色</div></div>'
+            + '<div class="ws-stats-item"><div class="num">' + (stats.totalArtifacts || 0) + '</div><div class="lbl">产出物数</div></div>'
+            + '<div class="ws-stats-item"><div class="num">' + (stats.totalTokens || 0) + '</div><div class="lbl">消耗Token</div></div>'
+            + '</div>';
+
+        // 进度条
+        const progress = data.progressPercent || 0;
+        html += '<div class="ws-progress-bar" style="margin-bottom:12px"><div class="ws-progress-fill" style="width:' + progress + '%"></div></div>';
+
+        // 角色工作区
+        const roles = data.roles || [];
+        html += '<div style="margin-bottom:6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">👥 角色工作区</div>';
+        roles.forEach(roleData => {
+            const statusCls = roleData.status || 'idle';
+            const statusLabel = {idle: '空闲', working: '执行中...', done: '已完成', failed: '失败'}[statusCls] || statusCls;
+            const meta = WS_ROLE_META[roleData.role] || {name: roleData.displayName || roleData.role, emoji: roleData.emoji || '👤'};
+
+            html += '<div class="ws-role-card ' + statusCls + '">';
+            html += '<div class="ws-role-card-header">'
+                + '<div class="ws-role-avatar ' + statusCls + '">' + meta.emoji + '</div>'
+                + '<span class="ws-role-name">' + escapeHtml(roleData.displayName || meta.name) + '</span>'
+                + (statusCls === 'working' ? '<div class="expert-spinner"></div>' : '')
+                + '<span class="ws-role-badge ' + statusCls + '">' + statusLabel + '</span>'
+                + '</div>';
+
+            // 产出物列表
+            if (roleData.artifacts && roleData.artifacts.length > 0) {
+                html += '<div class="ws-role-artifacts">';
+                roleData.artifacts.forEach(art => {
+                    const icon = ARTIFACT_ICONS[art.type] || '\uD83D\uDCCE';
+                    const sizeStr = art.sizeBytes > 1024 ? (art.sizeBytes / 1024).toFixed(1) + 'KB' : (art.sizeBytes || 0) + 'B';
+                    const artId = (art.id || '').replace(/'/g, "\\'");
+                    const artName = escapeHtml(art.name || '').replace(/'/g, "\\'");
+                    html += '<div class="ws-artifact-item" onclick="viewArtifact(\'' + data.id + '\',\'' + roleData.role + '\',\'' + artId + '\',\'' + artName + '\')">'
+                        + '<span class="ws-artifact-icon">' + icon + '</span>'
+                        + '<span class="ws-artifact-name">' + escapeHtml(art.name) + '</span>'
+                        + '<span class="ws-artifact-size">' + sizeStr + '</span>'
+                        + '</div>';
+                });
+                html += '</div>';
+            } else if (statusCls === 'done') {
+                // 已完成但无产出物记录（从黑板读取产出）
+                html += '<div class="ws-role-artifacts">';
+                html += '<div class="ws-artifact-item" style="color:var(--text-muted);cursor:default;">'
+                    + '<span class="ws-artifact-icon">\uD83D\uDCC4</span>'
+                    + '<span class="ws-artifact-name">产出物持久化中...</span>'
+                    + '</div>';
+                html += '</div>';
+            }
+
+            html += '</div>';
+        });
+
+        // 共享产出物
+        const sharedArts = data.sharedArtifacts || [];
+        if (sharedArts.length > 0) {
+            html += '<div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">🌐 共享产出</div>';
+            sharedArts.forEach(art => {
+                const icon = ARTIFACT_ICONS[art.type] || '📎';
+                html += '<div class="ws-artifact-item" onclick="viewArtifact(\'' + data.id + '\',\'shared\',\'' + art.id + '\',\'' + escapeHtml(art.name).replace(/'/g, "\\'") + '\')">'
+                    + '<span class="ws-artifact-icon">' + icon + '</span>'
+                    + '<span class="ws-artifact-name">' + escapeHtml(art.name) + '</span>'
+                    + '</div>';
+            });
+        }
+
+        // 综合报告
+        if (data.finalReport) {
+            html += '<div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">📋 综合交付报告</div>';
+            html += '<div class="ws-artifact-item" onclick="viewArtifact(\'' + data.id + '\',\'report\',\'final\',\'综合交付报告\')">'
+                + '<span class="ws-artifact-icon">📋</span>'
+                + '<span class="ws-artifact-name">综合交付报告</span>'
+                + '</div>';
+        }
+
+        workspaceContent.innerHTML = html;
+    }
+
+    /** 查看产出物详情 */
+    window.viewArtifact = async function(projectId, role, artifactId, artifactName) {
+        // 如果是综合报告，直接从项目详情获取
+        if (role === 'report') {
+            try {
+                const resp = await fetch('/api/workspace/' + projectId);
+                const data = await resp.json();
+                if (data.success && data.finalReport) {
+                    showArtifactModal(artifactName, data.finalReport);
+                    return;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // 其他产出物从 API 读取
+        try {
+            const resp = await fetch('/api/workspace/' + projectId + '/artifact/' + role + '/' + artifactId);
+            const data = await resp.json();
+            if (data.success && data.content) {
+                showArtifactModal(artifactName, data.content);
+            } else {
+                showArtifactModal(artifactName, '暂无内容');
+            }
+        } catch (e) {
+            showArtifactModal(artifactName, '读取失败: ' + e.message);
         }
     };
+
+    /** 弹出产出物查看弹层 */
+    function showArtifactModal(title, content) {
+        // 移除已有弹层
+        const existing = document.getElementById('artifactModal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'ws-artifact-modal';
+        modal.id = 'artifactModal';
+        modal.innerHTML = '<div class="ws-artifact-modal-content">'
+            + '<div class="ws-artifact-modal-header">'
+            + '<span class="ws-artifact-modal-title">📄 ' + escapeHtml(title) + '</span>'
+            + '<button class="ws-artifact-modal-close" id="artifactModalClose">✕</button>'
+            + '</div>'
+            + '<div class="ws-artifact-modal-body">'
+            + '<div class="msg-bubble md-render" style="border:none;padding:0;background:transparent;">'
+            + renderMarkdown(content)
+            + '</div>'
+            + '</div>'
+            + '</div>';
+
+        document.body.appendChild(modal);
+
+        // 代码块添加复制按钮
+        const mdRender = modal.querySelector('.md-render');
+        if (mdRender) addCopyButtons(mdRender);
+
+        // 关闭按钮
+        document.getElementById('artifactModalClose').addEventListener('click', function() {
+            modal.remove();
+        });
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) modal.remove();
+        });
+    }
+
+    btnWorkspace.addEventListener('click', toggleWorkspacePanel);
+    btnWsClose.addEventListener('click', toggleWorkspacePanel);
+
+    // ========== 技能中心功能 ==========
+
+    const btnSkills = document.getElementById('btnSkills');
+    const btnSkillsClose = document.getElementById('btnSkillsClose');
+    const skillsPanel = document.getElementById('skillsPanel');
+    const skillsContent = document.getElementById('skillsContent');
+    const skillsSub = document.getElementById('skillsSub');
+    let skillsPanelVisible = false;
+    let skillsCurrentTab = 'installed';
+
+    function toggleSkillsPanel() {
+        skillsPanelVisible = !skillsPanelVisible;
+        if (skillsPanelVisible) {
+            // 关闭其他面板
+            if (cronPanelVisible) toggleCronPanel();
+            if (memPanelVisible) toggleMemoryPanel();
+            if (expertPanelVisible) toggleExpertPanel();
+            if (wsPanelVisible) toggleWorkspacePanel();
+            skillsPanel.classList.remove('collapsed');
+            loadSkillsTab(skillsCurrentTab);
+        } else {
+            skillsPanel.classList.add('collapsed');
+        }
+    }
+
+    // 技能 Tab 点击
+    document.querySelectorAll('.skills-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.skills-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            skillsCurrentTab = this.dataset.stab;
+            loadSkillsTab(skillsCurrentTab);
+        });
+    });
+
+    async function loadSkillsTab(tab) {
+        skillsContent.innerHTML = '<div class="skills-empty"><div class="skills-empty-icon">⏳</div><p>加载中...</p></div>';
+        try {
+            if (tab === 'installed') {
+                const resp = await fetch('/api/skills');
+                const data = await resp.json();
+                if (data.success) {
+                    renderSkillList(data.skills || []);
+                    skillsSub.textContent = (data.enabledCount || 0) + '/' + (data.total || 0) + ' 已启用';
+                }
+            } else if (tab === 'install') {
+                renderInstallForm();
+            }
+        } catch (e) {
+            skillsContent.innerHTML = '<div class="skills-empty"><div class="skills-empty-icon">❌</div><p>加载失败</p></div>';
+        }
+    }
+
+    function renderSkillList(skills) {
+        if (!skills || skills.length === 0) {
+            skillsContent.innerHTML = '<div class="skills-empty"><div class="skills-empty-icon">🔧</div><p>暂无技能</p><p style="margin-top:6px;font-size:11px;">切换到“安装技能”标签页添加技能</p></div>';
+            return;
+        }
+
+        let html = '';
+        skills.sort((a, b) => (a.enabled === b.enabled) ? 0 : a.enabled ? -1 : 1);
+        skills.forEach(skill => {
+            const statusClass = skill.enabled ? 'enabled' : 'disabled';
+            const toggleText = skill.enabled ? '禁用' : '启用';
+            const toggleAction = skill.enabled ? 'disable' : 'enable';
+            const sourceClass = (skill.source || 'local').toLowerCase();
+            const sourceLabel = {builtin: '内置', local: '本地', marketplace: '市场'}[sourceClass] || skill.source;
+
+            html += '<div class="skill-card' + (skill.enabled ? '' : ' disabled') + '">';
+            html += '<div class="skill-card-header">';
+            html += '<div class="skill-card-title"><span class="skill-status-dot ' + statusClass + '"></span>' + escapeHtml(skill.name) + '</div>';
+            html += '<div class="skill-card-actions">';
+            html += '<button class="skill-action-btn" onclick="toggleSkillState(\'' + skill.name + '\', \'' + toggleAction + '\')">' + toggleText + '</button>';
+            if (sourceClass !== 'builtin') {
+                html += '<button class="skill-action-btn danger" onclick="uninstallSkill(\'' + skill.name + '\')">卸载</button>';
+            }
+            html += '</div></div>';
+            html += '<div class="skill-card-body">';
+            html += '<div class="skill-card-row"><span class="label">描述</span><span class="value">' + escapeHtml(skill.description || '-') + '</span></div>';
+            html += '<div class="skill-card-row"><span class="label">版本</span><span class="value">' + escapeHtml(skill.version || '1.0.0') + '</span></div>';
+            html += '<div class="skill-card-row"><span class="label">作者</span><span class="value">' + escapeHtml(skill.author || '-') + '</span></div>';
+            html += '<div class="skill-card-row"><span class="label">来源</span><span class="value"><span class="skill-source-badge ' + sourceClass + '">' + sourceLabel + '</span></span></div>';
+
+            // 标签
+            if (skill.tags && skill.tags.length > 0) {
+                html += '<div class="skill-tags">';
+                skill.tags.forEach(t => {
+                    html += '<span class="skill-tag">' + escapeHtml(t) + '</span>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div></div>';
+        });
+
+        // 重新扫描按钮
+        html += '<button class="skill-rescan-btn" onclick="rescanSkills()">🔄 重新扫描技能目录</button>';
+
+        skillsContent.innerHTML = html;
+    }
+
+    function renderInstallForm() {
+        const sampleMd = '---\nname: my-skill\ndescription: 我的自定义技能\nversion: 1.0.0\nauthor: me\ntags: demo,custom\ntriggers: 自定义,测试\n---\n# System Prompt\n你是一个自定义技能助手。当用户提到相关关键词时，按照以下方式回答...';
+
+        let html = '<div class="skill-install-form">';
+        html += '<div class="skill-install-title">📦 安装新技能</div>';
+        html += '<div class="skill-form-group">';
+        html += '<label class="skill-form-label">技能名称</label>';
+        html += '<input type="text" class="skill-form-input" id="skillInstallName" placeholder="例如：my-skill" />';
+        html += '</div>';
+        html += '<div class="skill-form-group">';
+        html += '<label class="skill-form-label">技能内容 (skill.md)</label>';
+        html += '<textarea class="skill-form-textarea" id="skillInstallContent" placeholder="' + escapeHtml(sampleMd) + '"></textarea>';
+        html += '</div>';
+        html += '<button class="skill-install-btn" id="btnSkillInstall" onclick="installSkill()">安装技能</button>';
+        html += '<div class="skill-install-hint">';
+        html += '<p>技能文件使用 Markdown 格式，包含 Front Matter 元数据和 Prompt 模板：</p>';
+        html += '<p>&bull; <code>name</code> - 技能名称（唯一标识）</p>';
+        html += '<p>&bull; <code>description</code> - 技能描述</p>';
+        html += '<p>&bull; <code>tags</code> - 分类标签（逗号分隔）</p>';
+        html += '<p>&bull; <code>triggers</code> - 触发关键词（逗号分隔）</p>';
+        html += '<p>&bull; <code>---</code> 之后的内容为技能的 Prompt 模板</p>';
+        html += '</div>';
+        html += '</div>';
+
+        skillsContent.innerHTML = html;
+    }
+
+    window.toggleSkillState = async function(name, action) {
+        try {
+            const resp = await fetch('/api/skills/' + name + '/' + action, { method: 'PUT' });
+            const data = await resp.json();
+            if (data.success) {
+                loadSkillsTab('installed');
+            } else {
+                alert(data.error || '操作失败');
+            }
+        } catch (e) {
+            console.error('技能状态切换失败:', e);
+        }
+    };
+
+    window.uninstallSkill = async function(name) {
+        if (!confirm('确定卸载技能 "' + name + '"？')) return;
+        try {
+            const resp = await fetch('/api/skills/' + name, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) {
+                loadSkillsTab('installed');
+            } else {
+                alert(data.error || '卸载失败');
+            }
+        } catch (e) {
+            console.error('卸载技能失败:', e);
+        }
+    };
+
+    window.installSkill = async function() {
+        const nameEl = document.getElementById('skillInstallName');
+        const contentEl = document.getElementById('skillInstallContent');
+        const btnEl = document.getElementById('btnSkillInstall');
+
+        const name = (nameEl.value || '').trim();
+        const content = (contentEl.value || '').trim();
+
+        if (!name) { alert('请输入技能名称'); return; }
+        if (!content) { alert('请输入技能内容'); return; }
+
+        btnEl.disabled = true;
+        btnEl.textContent = '安装中...';
+
+        try {
+            const resp = await fetch('/api/skills/install', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, content: content })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                alert('技能 "' + name + '" 安装成功！v' + (data.version || '1.0.0'));
+                // 切换到已安装列表
+                skillsCurrentTab = 'installed';
+                document.querySelectorAll('.skills-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.stab === 'installed');
+                });
+                loadSkillsTab('installed');
+            } else {
+                alert('安装失败: ' + (data.error || '未知错误'));
+            }
+        } catch (e) {
+            alert('安装失败: ' + e.message);
+        } finally {
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.textContent = '安装技能';
+            }
+        }
+    };
+
+    window.rescanSkills = async function() {
+        try {
+            const resp = await fetch('/api/skills/scan', { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                alert('扫描完成，共发现 ' + (data.totalSkills || 0) + ' 个技能');
+                loadSkillsTab('installed');
+            }
+        } catch (e) {
+            console.error('扫描失败:', e);
+        }
+    };
+
+    btnSkills.addEventListener('click', toggleSkillsPanel);
+    btnSkillsClose.addEventListener('click', toggleSkillsPanel);
 </script>
 
 </body>
