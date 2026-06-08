@@ -204,7 +204,9 @@ public class ReflectionAgent extends Agent {
      * 判断反思结果是否表示回答已令人满意
      */
     private boolean isSatisfactory(String reflection) {
-        if (reflection == null) return true;
+        if (reflection == null) {
+            return true;
+        }
         // 检查是否包含满意标记
         return reflection.toUpperCase().contains("SATISFACTORY")
                 || reflection.contains("已足够好")
