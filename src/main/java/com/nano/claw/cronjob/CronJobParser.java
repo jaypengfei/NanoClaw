@@ -5,6 +5,8 @@ import com.nano.claw.llm.ModelFacade;
 import com.nano.claw.llm.ModelRequest;
 import com.nano.claw.llm.ModelResponse;
 import com.nano.claw.messages.Message;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +32,7 @@ import java.util.regex.Pattern;
 public class CronJobParser {
 
     private static final Logger log = LoggerFactory.getLogger(CronJobParser.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
      * 解析结果
@@ -309,28 +312,23 @@ public class CronJobParser {
         try {
             // 提取JSON部分（可能被markdown代码块包裹）
             String json = content.trim();
-            if (json.contains("```")) {
-                int start = json.indexOf("{");
-                int end = json.lastIndexOf("}") + 1;
-                if (start >= 0 && end > start) {
-                    json = json.substring(start, end);
-                }
-            } else if (json.startsWith("{")) {
-                int end = json.lastIndexOf("}") + 1;
-                if (end > 0) {
-                    json = json.substring(0, end);
-                }
+            int start = json.indexOf("{");
+            int end = json.lastIndexOf("}") + 1;
+            if (start >= 0 && end > start) {
+                json = json.substring(start, end);
             }
 
-            // 简单JSON解析（不引入额外依赖）
-            if (json.contains("\"error\"")) {
+            JsonNode node = MAPPER.readTree(json);
+
+            // 检查是否有错误
+            if (node.has("error")) {
                 return ParseResult.fail("LLM无法解析该输入为定时任务");
             }
 
-            String cronExpression = extractJsonField(json, "cronExpression");
-            String scheduleDesc = extractJsonField(json, "scheduleDesc");
-            String name = extractJsonField(json, "name");
-            String query = extractJsonField(json, "query");
+            String cronExpression = getFieldAsString(node, "cronExpression");
+            String scheduleDesc = getFieldAsString(node, "scheduleDesc");
+            String name = getFieldAsString(node, "name");
+            String query = getFieldAsString(node, "query");
 
             if (cronExpression == null || cronExpression.isEmpty()) {
                 return ParseResult.fail("LLM未返回cron表达式");
@@ -351,49 +349,12 @@ public class CronJobParser {
     }
 
     /**
-     * 从 JSON 字符串中提取字段值
+     * 安全地从 JsonNode 获取字符串值
      */
-    private static String extractJsonField(String json, String fieldName) {
-        String key = "\"" + fieldName + "\"";
-        int keyIdx = json.indexOf(key);
-        if (keyIdx < 0) return null;
-
-        int colonIdx = json.indexOf(":", keyIdx + key.length());
-        if (colonIdx < 0) return null;
-
-        int valueStart = -1;
-        int valueEnd = -1;
-
-        // 找值开始位置（跳过空白）
-        for (int i = colonIdx + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (c == '"') {
-                valueStart = i + 1;
-                // 找值结束位置
-                for (int j = i + 1; j < json.length(); j++) {
-                    if (json.charAt(j) == '"' && json.charAt(j - 1) != '\\') {
-                        valueEnd = j;
-                        break;
-                    }
-                }
-                break;
-            } else if (c != ' ' && c != '\t' && c != '\n' && c != '\r') {
-                // 非字符串值（如数字）
-                valueStart = i;
-                for (int j = i; j < json.length(); j++) {
-                    if (json.charAt(j) == ',' || json.charAt(j) == '}' || json.charAt(j) == '\n') {
-                        valueEnd = j;
-                        break;
-                    }
-                }
-                break;
-            }
-        }
-
-        if (valueStart >= 0 && valueEnd > valueStart) {
-            return json.substring(valueStart, valueEnd).trim();
-        }
-        return null;
+    private static String getFieldAsString(JsonNode node, String fieldName) {
+        JsonNode field = node.get(fieldName);
+        if (field == null || field.isNull()) return null;
+        return field.asText();
     }
 
     /**

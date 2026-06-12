@@ -135,6 +135,7 @@ public class AgentFactory {
             case "EXPERT_PANEL":
             case "EXPERTPANEL":
             case "PANEL":
+            case "EXPERT":
                 return AgentMode.EXPERT_PANEL;
             default:
                 return AgentMode.REACT;
