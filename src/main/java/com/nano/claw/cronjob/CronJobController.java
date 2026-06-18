@@ -93,13 +93,18 @@ public class CronJobController {
         job.setQuery(parseResult.getQuery());
         job.setDescription(message);
 
-        // 添加到管理器
-        CronJob created = cronJobManager.addJob(job);
+        try {
+            CronJob created = cronJobManager.addJob(job);
 
-        result.put("success", true);
-        result.put("job", created);
-        result.put("parseSource", parseResult.isRuleMatched() ? "rule" : "llm");
-        log.info("[CRON-API] 创建定时任务成功: id={}, name={}, cron={}", created.getId(), created.getName(), created.getCronExpression());
+            result.put("success", true);
+            result.put("job", created);
+            result.put("parseSource", parseResult.isRuleMatched() ? "rule" : "llm");
+            log.info("[CRON-API] 创建定时任务成功: id={}, name={}, cron={}", created.getId(), created.getName(), created.getCronExpression());
+        } catch (RuntimeException e) {
+            log.error("[CRON-API] 创建定时任务失败", e);
+            result.put("success", false);
+            result.put("error", "创建定时任务失败: " + e.getMessage());
+        }
         return result;
     }
 
@@ -142,10 +147,15 @@ public class CronJobController {
         job.setQuery(query);
         job.setScheduleDesc(scheduleDesc != null ? scheduleDesc : cronExpression);
 
-        CronJob created = cronJobManager.addJob(job);
-
-        result.put("success", true);
-        result.put("job", created);
+        try {
+            CronJob created = cronJobManager.addJob(job);
+            result.put("success", true);
+            result.put("job", created);
+        } catch (RuntimeException e) {
+            log.error("[CRON-API] 直接创建定时任务失败", e);
+            result.put("success", false);
+            result.put("error", "创建定时任务失败: " + e.getMessage());
+        }
         return result;
     }
 

@@ -1,6 +1,8 @@
 package com.nano.claw.agent.mcp;
 
 import com.nano.claw.utils.HttpUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -20,6 +22,8 @@ import java.util.Set;
  * @date 2026/5/19
  */
 public class HttpTool implements Tool {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** 禁止访问的内网IP前缀 */
     private static final Set<String> BLOCKED_IP_PREFIXES = new HashSet<>(Arrays.asList(
@@ -127,21 +131,17 @@ public class HttpTool implements Tool {
     }
 
     /**
-     * 简单的 JSON 值提取（避免依赖复杂 JSON 解析）
+     * 使用 Jackson 安全解析 JSON 值
      */
     private String extractJsonValue(String json, String key) {
         if (json == null) return null;
-        String pattern = "\"" + key + "\"";
-        int idx = json.indexOf(pattern);
-        if (idx < 0) return null;
-        // 找到冒号后的值
-        int colonIdx = json.indexOf(":", idx + pattern.length());
-        if (colonIdx < 0) return null;
-        // 找到值的起始引号
-        int startQuote = json.indexOf("\"", colonIdx + 1);
-        if (startQuote < 0) return null;
-        int endQuote = json.indexOf("\"", startQuote + 1);
-        if (endQuote < 0) return null;
-        return json.substring(startQuote + 1, endQuote);
+        try {
+            JsonNode node = MAPPER.readTree(json);
+            JsonNode value = node.get(key);
+            if (value == null || value.isNull()) return null;
+            return value.asText();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

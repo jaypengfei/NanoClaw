@@ -4,10 +4,18 @@ import com.nano.claw.flow.ChatFlow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.scheduling.support.CronExpression;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.util.*;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -33,11 +41,21 @@ public class CronJobManager {
     /** 调度 Future，key=jobId */
     private final Map<String, ScheduledFuture<?>> scheduledFutures = new ConcurrentHashMap<>();
 
+    /** 生命周期与持久化锁 */
+    private final Object lifecycleLock = new Object();
+
+    /** 定时任务持久化存储 */
+    private final CronJobStore cronJobStore;
+
     /** 调度线程池 */
     private ScheduledExecutorService scheduler;
 
     /** ChatFlow 引用，由 Spring 注入后设置 */
     private ChatFlow chatFlow;
+
+    public CronJobManager(CronJobStore cronJobStore) {
+        this.cronJobStore = cronJobStore;
+    }
 
     @PostConstruct
     public void init() {
@@ -51,7 +69,8 @@ public class CronJobManager {
                 return t;
             }
         });
-        log.info("[CRON-MGR] 定时任务管理器初始化完成");
+        restorePersistedJobs();
+        log.info("[CRON-MGR] 定时任务管理器初始化完成，已加载 {} 个任务", jobs.size());
     }
 
     @PreDestroy
@@ -76,10 +95,20 @@ public class CronJobManager {
      * @return 添加后的任务（含计算好的nextRunAt）
      */
     public CronJob addJob(CronJob job) {
-        jobs.put(job.getId(), job);
-        scheduleJob(job);
-        log.info("[CRON-MGR] 添加定时任务: id={}, name={}, cron={}", job.getId(), job.getName(), job.getCronExpression());
-        return job;
+        prepareNewJob(job);
+        synchronized (lifecycleLock) {
+            jobs.put(job.getId(), job);
+            try {
+                scheduleJob(job);
+                persistJobs();
+                log.info("[CRON-MGR] 添加定时任务: id={}, name={}, cron={}", job.getId(), job.getName(), job.getCronExpression());
+                return job;
+            } catch (RuntimeException e) {
+                cancelSchedule(job.getId());
+                jobs.remove(job.getId());
+                throw e;
+            }
+        }
     }
 
     /**
@@ -89,13 +118,24 @@ public class CronJobManager {
      * @return 是否删除成功
      */
     public boolean removeJob(String jobId) {
-        CronJob job = jobs.remove(jobId);
-        if (job != null) {
-            cancelSchedule(jobId);
-            log.info("[CRON-MGR] 删除定时任务: id={}, name={}", jobId, job.getName());
-            return true;
+        synchronized (lifecycleLock) {
+            CronJob job = jobs.remove(jobId);
+            if (job != null) {
+                cancelSchedule(jobId);
+                try {
+                    persistJobs();
+                    log.info("[CRON-MGR] 删除定时任务: id={}, name={}", jobId, job.getName());
+                    return true;
+                } catch (RuntimeException e) {
+                    jobs.put(jobId, job);
+                    if (job.getStatus() == CronJob.Status.ACTIVE) {
+                        scheduleJob(job);
+                    }
+                    throw e;
+                }
+            }
+            return false;
         }
-        return false;
     }
 
     /**
@@ -105,15 +145,32 @@ public class CronJobManager {
      * @return 暂停后的任务，不存在返回null
      */
     public CronJob pauseJob(String jobId) {
-        CronJob job = jobs.get(jobId);
-        if (job == null) {
-            return null;
-        }
+        synchronized (lifecycleLock) {
+            CronJob job = jobs.get(jobId);
+            if (job == null) {
+                return null;
+            }
 
-        job.setStatus(CronJob.Status.PAUSED);
-        cancelSchedule(jobId);
-        log.info("[CRON-MGR] 暂停定时任务: id={}, name={}", jobId, job.getName());
-        return job;
+            CronJob.Status previousStatus = job.getStatus();
+            long previousNextRunAt = job.getNextRunAt();
+
+            job.setStatus(CronJob.Status.PAUSED);
+            job.setNextRunAt(0L);
+            cancelSchedule(jobId);
+
+            try {
+                persistJobs();
+                log.info("[CRON-MGR] 暂停定时任务: id={}, name={}", jobId, job.getName());
+                return job;
+            } catch (RuntimeException e) {
+                job.setStatus(previousStatus);
+                job.setNextRunAt(previousNextRunAt);
+                if (previousStatus == CronJob.Status.ACTIVE) {
+                    scheduleJob(job);
+                }
+                throw e;
+            }
+        }
     }
 
     /**
@@ -123,15 +180,31 @@ public class CronJobManager {
      * @return 恢复后的任务，不存在返回null
      */
     public CronJob resumeJob(String jobId) {
-        CronJob job = jobs.get(jobId);
-        if (job == null) {
-            return null;
-        }
+        synchronized (lifecycleLock) {
+            CronJob job = jobs.get(jobId);
+            if (job == null) {
+                return null;
+            }
 
-        job.setStatus(CronJob.Status.ACTIVE);
-        scheduleJob(job);
-        log.info("[CRON-MGR] 恢复定时任务: id={}, name={}", jobId, job.getName());
-        return job;
+            CronJob.Status previousStatus = job.getStatus();
+            long previousNextRunAt = job.getNextRunAt();
+
+            job.setStatus(CronJob.Status.ACTIVE);
+            try {
+                scheduleJob(job);
+                persistJobs();
+                log.info("[CRON-MGR] 恢复定时任务: id={}, name={}", jobId, job.getName());
+                return job;
+            } catch (RuntimeException e) {
+                cancelSchedule(jobId);
+                job.setStatus(previousStatus);
+                job.setNextRunAt(previousNextRunAt);
+                if (previousStatus == CronJob.Status.ACTIVE) {
+                    scheduleJob(job);
+                }
+                throw e;
+            }
+        }
     }
 
     /**
@@ -170,52 +243,36 @@ public class CronJobManager {
     /**
      * 调度单个任务
      * <p>
-     * 简化版：将cron表达式解析为固定间隔调度。
-     * 对于"每X分钟/小时"类型使用固定间隔；
-     * 对于"每天X点"类型计算到下次执行的时间延迟。
+     * 按 cron 表达式逐次计算下一次执行时间并进行单次调度，
+     * 每次执行结束后重新计算下一次触发时刻，确保重启恢复后仍按真实 cron 语义运行。
      */
     private void scheduleJob(CronJob job) {
         if (job.getStatus() != CronJob.Status.ACTIVE) {
+            job.setNextRunAt(0L);
             return;
+        }
+
+        if (scheduler == null) {
+            throw new IllegalStateException("调度器尚未初始化");
         }
 
         cancelSchedule(job.getId());
 
-        try {
-            long initialDelay = calculateInitialDelay(job.getCronExpression());
-            long period = calculatePeriod(job.getCronExpression());
-
-            if (period > 0) {
-                ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(
-                        () -> executeJob(job),
-                        initialDelay,
-                        period,
-                        TimeUnit.MILLISECONDS
-                );
-                scheduledFutures.put(job.getId(), future);
-                job.setNextRunAt(System.currentTimeMillis() + initialDelay);
-                log.info("[CRON-MGR] 调度任务: id={}, 首次延迟={}ms, 周期={}ms", job.getId(), initialDelay, period);
-            } else {
-                // 无法计算周期，使用单次延迟调度
-                if (initialDelay > 0) {
-                    ScheduledFuture<?> future = scheduler.schedule(
-                            () -> {
-                                executeJob(job);
-                                // 执行完后重新调度（每天型任务）
-                                scheduleJob(job);
-                            },
-                            initialDelay,
-                            TimeUnit.MILLISECONDS
-                    );
-                    scheduledFutures.put(job.getId(), future);
-                    job.setNextRunAt(System.currentTimeMillis() + initialDelay);
-                    log.info("[CRON-MGR] 单次调度任务: id={}, 延迟={}ms", job.getId(), initialDelay);
-                }
-            }
-        } catch (Exception e) {
-            log.error("[CRON-MGR] 调度任务失败: id={}, error={}", job.getId(), e.getMessage());
-            job.setStatus(CronJob.Status.ERROR);
+        Instant nextExecution = calculateNextExecution(job.getCronExpression(), Instant.now());
+        if (nextExecution == null) {
+            throw new IllegalArgumentException("无法计算下次执行时间: " + job.getCronExpression());
         }
+
+        long delayMs = Math.max(0L, nextExecution.toEpochMilli() - System.currentTimeMillis());
+        ScheduledFuture<?> future = scheduler.schedule(
+                () -> runScheduledJob(job.getId()),
+                delayMs,
+                TimeUnit.MILLISECONDS
+        );
+        scheduledFutures.put(job.getId(), future);
+        job.setNextRunAt(nextExecution.toEpochMilli());
+        log.info("[CRON-MGR] 调度任务: id={}, nextRunAt={}, delay={}ms, cron={}",
+                job.getId(), new Date(job.getNextRunAt()), delayMs, job.getCronExpression());
     }
 
     /**
@@ -253,122 +310,227 @@ public class CronJobManager {
             String resultSummary;
             boolean success;
             if (response.isSuccess()) {
-                resultSummary = response.getAnswer();
-                if (resultSummary != null && resultSummary.length() > 200) {
-                    resultSummary = resultSummary.substring(0, 200) + "...";
-                }
+                resultSummary = truncateResult(response.getAnswer());
                 success = true;
                 log.info("[CRON-MGR] 定时任务执行成功: id={}, name={}", job.getId(), job.getName());
             } else {
-                resultSummary = "执行失败: " + response.getError();
+                resultSummary = truncateResult("执行失败: " + response.getError());
                 success = false;
                 log.warn("[CRON-MGR] 定时任务执行失败: id={}, name={}, error={}", job.getId(), job.getName(), response.getError());
             }
 
             job.setLastResult(resultSummary);
             job.addExecutionRecord(new CronJob.ExecutionRecord(System.currentTimeMillis(), resultSummary, success));
-
-            // 更新下次执行时间
-            long period = calculatePeriod(job.getCronExpression());
-            if (period > 0) {
-                job.setNextRunAt(System.currentTimeMillis() + period);
-            } else {
-                // 每天型任务，下次执行时间=明天同一时刻
-                job.setNextRunAt(System.currentTimeMillis() + 24 * 60 * 60 * 1000L);
-            }
-
         } catch (Exception e) {
             log.error("[CRON-MGR] 定时任务执行异常: id={}, name={}", job.getId(), job.getName(), e);
-            job.setLastResult("执行异常: " + e.getMessage());
-            job.addExecutionRecord(new CronJob.ExecutionRecord(System.currentTimeMillis(), e.getMessage(), false));
-            job.setStatus(CronJob.Status.ERROR);
+            String errorMessage = "执行异常: " + e.getMessage();
+            job.setLastResult(errorMessage);
+            job.addExecutionRecord(new CronJob.ExecutionRecord(System.currentTimeMillis(), errorMessage, false));
+            markJobError(job, errorMessage);
         }
     }
 
-    /**
-     * 计算到下次执行的初始延迟
-     * <p>
-     * 简化版：解析cron表达式中指定的时/分，计算到今天/明天的延迟
-     */
-    private long calculateInitialDelay(String cronExpression) {
-        String[] parts = cronExpression.trim().split("\\s+");
-        if (parts.length != 6) return 60000L; // 默认1分钟后
+    private void runScheduledJob(String jobId) {
+        CronJob job = jobs.get(jobId);
+        if (job == null) {
+            scheduledFutures.remove(jobId);
+            return;
+        }
 
-        try {
-            Calendar now = Calendar.getInstance();
-            Calendar next = Calendar.getInstance();
+        if (chatFlow == null) {
+            log.warn("[CRON-MGR] ChatFlow 未初始化，推迟本轮调度: id={}", jobId);
+        } else if (job.getStatus() == CronJob.Status.ACTIVE) {
+            executeJob(job);
+        }
 
-            int minute = parseCronPart(parts[1], now.get(Calendar.MINUTE));
-            int hour = parseCronPart(parts[2], now.get(Calendar.HOUR_OF_DAY));
+        synchronized (lifecycleLock) {
+            scheduledFutures.remove(jobId);
 
-            next.set(Calendar.MINUTE, minute);
-            next.set(Calendar.SECOND, parseCronPart(parts[0], 0));
-            next.set(Calendar.MILLISECOND, 0);
-
-            if (parts[2].equals("*") || parts[2].startsWith("*/")) {
-                // 间隔型（每隔X小时），直接从当前时间开始
-                return 0;
+            CronJob current = jobs.get(jobId);
+            if (current == null) {
+                return;
             }
 
-            next.set(Calendar.HOUR_OF_DAY, hour);
-
-            if (next.before(now)) {
-                next.add(Calendar.DAY_OF_MONTH, 1);
+            if (current.getStatus() == CronJob.Status.ACTIVE) {
+                try {
+                    scheduleJob(current);
+                } catch (RuntimeException e) {
+                    log.error("[CRON-MGR] 重新调度失败: id={}, error={}", current.getId(), e.getMessage());
+                    markJobError(current, "重新调度失败: " + e.getMessage());
+                }
+            } else {
+                current.setNextRunAt(0L);
             }
 
-            return next.getTimeInMillis() - now.getTimeInMillis();
-
-        } catch (Exception e) {
-            return 60000L;
+            try {
+                persistJobs();
+            } catch (RuntimeException e) {
+                log.error("[CRON-MGR] 持久化执行结果失败: id={}, error={}", current.getId(), e.getMessage(), e);
+            }
         }
     }
 
+    private void restorePersistedJobs() {
+        List<CronJob> persistedJobs = cronJobStore.loadAll();
+        boolean changed = false;
+
+        synchronized (lifecycleLock) {
+            for (CronJob job : persistedJobs) {
+                if (!isValidPersistedJob(job)) {
+                    changed = true;
+                    continue;
+                }
+
+                normalizeLoadedJob(job);
+                jobs.put(job.getId(), job);
+            }
+
+            for (CronJob job : jobs.values()) {
+                if (job.getStatus() == CronJob.Status.ACTIVE) {
+                    try {
+                        scheduleJob(job);
+                    } catch (RuntimeException e) {
+                        log.error("[CRON-MGR] 恢复定时任务失败: id={}, error={}", job.getId(), e.getMessage());
+                        markJobError(job, "恢复调度失败: " + e.getMessage());
+                        changed = true;
+                    }
+                } else if (job.getNextRunAt() != 0L) {
+                    job.setNextRunAt(0L);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                persistJobs();
+            }
+        }
+    }
+
+    private void prepareNewJob(CronJob job) {
+        if (job == null) {
+            throw new IllegalArgumentException("定时任务不能为空");
+        }
+
+        if (job.getId() == null || job.getId().trim().isEmpty()) {
+            job.setId(UUID.randomUUID().toString().substring(0, 8));
+        }
+        if (job.getStatus() == null) {
+            job.setStatus(CronJob.Status.ACTIVE);
+        }
+        if (job.getExecutionHistory() == null) {
+            job.setExecutionHistory(new ArrayList<CronJob.ExecutionRecord>());
+        }
+        if (job.getCronExpression() == null || job.getCronExpression().trim().isEmpty()) {
+            throw new IllegalArgumentException("cron表达式不能为空");
+        }
+    }
+
+    private void normalizeLoadedJob(CronJob job) {
+        if (job.getStatus() == null) {
+            job.setStatus(CronJob.Status.ACTIVE);
+        }
+        if (job.getExecutionHistory() == null) {
+            job.setExecutionHistory(new ArrayList<CronJob.ExecutionRecord>());
+        }
+    }
+
+    private boolean isValidPersistedJob(CronJob job) {
+        if (job == null) {
+            log.warn("[CRON-MGR] 跳过空的持久化任务记录");
+            return false;
+        }
+        if (job.getId() == null || job.getId().trim().isEmpty()) {
+            log.warn("[CRON-MGR] 跳过缺少ID的持久化任务记录");
+            return false;
+        }
+        return true;
+    }
+
+    private void persistJobs() {
+        cronJobStore.saveAll(jobs.values());
+    }
+
+    private void markJobError(CronJob job, String errorMessage) {
+        job.setStatus(CronJob.Status.ERROR);
+        job.setNextRunAt(0L);
+        job.setLastResult(errorMessage);
+    }
+
+    private String truncateResult(String result) {
+        if (result == null) {
+            return "";
+        }
+        if (result.length() > 200) {
+            return result.substring(0, 200) + "...";
+        }
+        return result;
+    }
+
+    private Instant calculateNextExecution(String cronExpression, Instant referenceTime) {
+        CronExpression expression = CronExpression.parse(normalizeCronExpression(cronExpression));
+        ZonedDateTime next = expression.next(ZonedDateTime.ofInstant(referenceTime, ZoneId.systemDefault()));
+        if (next == null) {
+            return null;
+        }
+        return next.toInstant();
+    }
+
     /**
-     * 计算调度周期
-     *
-     * @return 周期（毫秒），0表示无法计算固定周期（如"每天X点"）
+     * 兼容项目中现有 Quartz 风格周字段（1=周日，2=周一...7=周六）。
      */
-    private long calculatePeriod(String cronExpression) {
+    private String normalizeCronExpression(String cronExpression) {
         String[] parts = cronExpression.trim().split("\\s+");
         if (parts.length != 6) {
-            return 0;
+            throw new IllegalArgumentException("cron表达式格式错误，应为6位(秒 分 时 日 月 周): " + cronExpression);
         }
 
-        // 每隔X分钟: "0 */X * * * ?"
-        if (parts[1].startsWith("*/")) {
-            try {
-                int interval = Integer.parseInt(parts[1].substring(2));
-                return interval * 60 * 1000L;
-            } catch (NumberFormatException e) {
-                return 0;
-            }
-        }
-
-        // 每隔X小时: "0 0 */X * * ?"
-        if (parts[2].startsWith("*/")) {
-            try {
-                int interval = Integer.parseInt(parts[2].substring(2));
-                return interval * 60 * 60 * 1000L;
-            } catch (NumberFormatException e) {
-                return 0;
-            }
-        }
-
-        // 每天/每周型，无固定周期，返回0（使用单次调度+重新调度方式）
-        return 0;
+        parts[5] = normalizeDayOfWeekField(parts[5]);
+        return String.join(" ", parts);
     }
 
-    /**
-     * 解析 cron 部分
-     */
-    private int parseCronPart(String part, int defaultValue) {
-        if (part.equals("*") || part.equals("?")) {
-            return defaultValue;
+    private String normalizeDayOfWeekField(String field) {
+        if (field == null || field.isEmpty() || "?".equals(field) || "*".equals(field) || field.matches(".*[A-Za-z].*")) {
+            return field;
         }
+
+        String[] tokens = field.split(",");
+        List<String> normalizedTokens = new ArrayList<>();
+        for (String token : tokens) {
+            normalizedTokens.add(normalizeDayOfWeekToken(token.trim()));
+        }
+        return String.join(",", normalizedTokens);
+    }
+
+    private String normalizeDayOfWeekToken(String token) {
+        if (token.isEmpty() || "*".equals(token) || "?".equals(token)) {
+            return token;
+        }
+
+        if (token.contains("/")) {
+            String[] stepParts = token.split("/", 2);
+            return normalizeDayOfWeekToken(stepParts[0]) + "/" + stepParts[1];
+        }
+
+        if (token.contains("-")) {
+            String[] rangeParts = token.split("-", 2);
+            return normalizeDayOfWeekToken(rangeParts[0]) + "-" + normalizeDayOfWeekToken(rangeParts[1]);
+        }
+
         try {
-            return Integer.parseInt(part);
+            int value = Integer.parseInt(token);
+            return String.valueOf(convertQuartzDayOfWeek(value));
         } catch (NumberFormatException e) {
-            return defaultValue;
+            return token;
         }
+    }
+
+    private int convertQuartzDayOfWeek(int value) {
+        if (value == 0) {
+            return 0;
+        }
+        if (value >= 1 && value <= 7) {
+            return value - 1;
+        }
+        throw new IllegalArgumentException("周字段超出范围: " + value);
     }
 }
