@@ -13,7 +13,7 @@ NanoClaw 是一个自主智能体（Agent）框架，核心理念是 **"小而�
 - **工具调用系统** — 内置 HTTP 请求和计算器工具，支持自定义扩展
 - **记忆系统** — 持久化对话记忆 + 自动压缩 + 用户画像提取，让 Agent 拥有长期记忆
 - **IM 通道接入** — 内置飞书通道，可扩展钉钉、企微等
-- **定时任务** — 支持自然语言创建定时任务，LLM 自动解析 Cron 表达式
+- **定时任务** — 支持自然语言创建定时任务，LLM 自动解析 Cron 表达式，并在重启后自动恢复
 - **暗色主题 Web UI** — 内置 Markdown 渲染 + 代码高亮 + 思考过程可视化
 
 ## 系统架构
@@ -93,6 +93,7 @@ Thought → Action → Observation → Thought → ... → Final Answer
 1. **解析** — LLM 将自然语言解析为 Cron 表达式 + 任务内容
 2. **创建** — 注册到调度器，按 Cron 表达式周期执行
 3. **执行** — 每次触发时通过 Agent 执行任务内容
+4. **持久化** — 任务元数据保存到 `data/cronjobs`，服务重启后自动恢复
 
 - 适用于："每天早上9点提醒我查看邮件"、"每隔30分钟检查服务器状态"
 
@@ -368,6 +369,9 @@ nanoclaw.feishu.verification-token=${FEISHU_VERIFICATION_TOKEN:}
 nanoclaw.memory.base-dir=./data/memory
 nanoclaw.memory.compress-threshold=4000
 nanoclaw.memory.max-retention-days=30
+
+# 定时任务持久化目录
+nanoclaw.cronjob.base-dir=./data/cronjobs
 ```
 
 ## 项目结构
@@ -475,4 +479,3 @@ NanoClaw
 
 1. 在 `Model` 枚举中添加模型
 2. 在 `ModelFacade.resolveModelName()` 中映射模型名称
-

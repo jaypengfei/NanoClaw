@@ -721,7 +721,20 @@ public class ChatFlow {
         job.setQuery(parseResult.getQuery());
         job.setDescription(message);
 
-        CronJob created = cronJobManager.addJob(job);
+        CronJob created;
+        try {
+            created = cronJobManager.addJob(job);
+        } catch (RuntimeException e) {
+            log.error("[FLOW] 创建定时任务失败", e);
+            allSteps.add(ThinkStep.of(ThinkStep.Type.OBSERVATION, "创建失败",
+                    "定时任务创建失败: " + e.getMessage(), 1));
+
+            ChatResponse chatResponse = ChatResponse.failure("创建定时任务失败：" + e.getMessage(), sessionId);
+            chatResponse.setMode("cronjob");
+            chatResponse.setThinkSteps(allSteps);
+            chatResponse.setDurationMs(System.currentTimeMillis() - startTime);
+            return chatResponse;
+        }
 
         allSteps.add(ThinkStep.of(ThinkStep.Type.OBSERVATION, "定时任务已创建",
                 "任务ID: " + created.getId() + ", cron: " + created.getCronExpression()
