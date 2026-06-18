@@ -1,10 +1,26 @@
 # NanoClaw
 
-一个轻量级的 AI Agent 框架，基于 Spring Boot 构建，支持多种推理模式、工具调用、记忆系统和 IM 通道接入。
+一个基于 Spring Boot 的轻量级 AI Agent 运行时框架，覆盖对话编排、工具调用、长期记忆、定时任务和多专家协作等核心能力。
 
 ## 项目简介
 
-NanoClaw 是一个自主智能体（Agent）框架，核心理念是 **"小而锋利"** —— 用最少的代码实现完整的 Agent 能力闭环。它不依赖 LangChain 等重量级框架，从 LLM 调用到 Agent 推理循环全部手写实现，代码清晰可读、易于扩展。
+NanoClaw 是一个自主智能体（Agent）框架，核心理念是 **"小而锋利"** —— 用尽量少的代码，把一个可运行的 Agent 系统从入口层、编排层、执行层到持久化层完整串起来。它不依赖 LangChain 等重量级框架，从 LLM 调用到 Agent 推理循环都采用手写实现，便于理解、调试和二次开发。
+
+### 项目定位
+
+NanoClaw 更像一个 **Agent Runtime / Playground / 样板工程**，而不是面向某个固定业务场景的成品系统。它主要解决的是：
+
+- 如何把 Web / API / IM / 定时任务等不同入口统一接入到同一套 Agent 编排流程
+- 如何在同一系统中组织 Chat、ReAct、Plan-and-Execute、Reflection、多专家协作等多种推理模式
+- 如何把工具、技能、长期记忆、工作区产物、定时任务持久化等能力组合成闭环
+- 如何在 Spring Boot + Java 生态里，用相对轻量的方式落地 Agent 基础设施
+
+### 适合用它做什么
+
+- 作为 AI Agent 架构学习和源码阅读样板
+- 作为企业内部 Agent 原型、PoC 或实验项目基础
+- 作为二次开发底座，继续扩展更多模型、工具、通道和业务技能
+- 作为多角色协作式任务编排的实验环境
 
 ### 核心特性
 
@@ -12,37 +28,91 @@ NanoClaw 是一个自主智能体（Agent）框架，核心理念是 **"小而�
 - **智能意图路由** — 规则引擎（关键词+正则）优先匹配 + LLM 兜底，大幅减少路由开销
 - **工具调用系统** — 内置 HTTP 请求和计算器工具，支持自定义扩展
 - **记忆系统** — 持久化对话记忆 + 自动压缩 + 用户画像提取，让 Agent 拥有长期记忆
+- **专家协作工作区** — 支持销售、产品、架构、开发、测试、项目经理等多角色协作，并把产出物写入工作区
 - **IM 通道接入** — 内置飞书通道，可扩展钉钉、企微等
 - **定时任务** — 支持自然语言创建定时任务，LLM 自动解析 Cron 表达式，并在重启后自动恢复
 - **暗色主题 Web UI** — 内置 Markdown 渲染 + 代码高亮 + 思考过程可视化
 
+### 一次请求的完整闭环
+
+无论请求来自 Web UI、REST API、飞书 Webhook 还是定时任务，主流程基本一致：
+
+1. **接入** — 请求进入 Controller / Webhook / Cron 入口
+2. **编排** — `ChatFlow` 统一处理会话、模式、记忆和渠道信息
+3. **路由** — `ModeRouter` + `IntentRuleEngine` 决定由哪种 Agent 模式执行
+4. **执行** — 目标 Agent 调用 LLM、工具、技能，必要时触发专家协作或工作区写入
+5. **持久化** — 记忆、工作区产物、定时任务状态分别写入 `data/` 目录
+6. **返回** — 结果通过普通响应、SSE 流式输出或 IM 回调返回给用户
+
 ## 系统架构
 
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                              接入层                                │
+│ Web UI(index.html) / REST API / SSE / Feishu Webhook / CronJob API │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         ChatFlow 编排层                            │
+│   会话管理(Session) / 记忆注入(Memory) / 渠道分发(Channel)         │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                  ModeRouter + IntentRuleEngine                     │
+│                     规则优先，LLM 兜底路由                         │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                            执行层                                  │
+│ ChatAgent / AgentLoop(ReAct) / PlanExecute / Reflection /          │
+│ ExpertPanelAgent                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+            │                     │                    │
+            ▼                     ▼                    ▼
+┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
+│ 工具与技能层        │  │ 模型调用层          │  │ 协作与调度层        │
+│ ToolRegistry       │  │ ModelFacade        │  │ WorkspaceManager   │
+│ SkillManager       │  │ ModelRequest/Resp  │  │ CronJobManager     │
+│ HttpTool/CalcTool  │  │                    │  │ Expert Panel Flow  │
+└────────────────────┘  └────────────────────┘  └────────────────────┘
+            │                     │                    │
+            └──────────────┬──────┴──────────────┬─────┘
+                           ▼                     ▼
+               ┌────────────────────┐  ┌────────────────────┐
+               │ 记忆与状态持久化    │  │ 文件产物持久化      │
+               │ data/memory        │  │ data/workspaces    │
+               │ data/cronjobs      │  │ data/skills        │
+               └────────────────────┘  └────────────────────┘
 ```
-┌────────────────────────────────────────────────────────────
-│                        NanoClaw                             
-├──────────┬──────────┬──────────┬───────────────────────────
-│  Web UI  │ REST API │  Feishu  │       CronJob            
-│ (index)  │ (/api/*) │ Webhook  │      Scheduler            
-├──────────┴──────────┴──────────┴───────────────────────────
-│                      ChatFlow (编排层)                      
-│           会话管理 │ 模式路由 │ 记忆注入 │ 通道分发              
-├────────────────────────────────────────────────────────────
-│                    ModeRouter (意图路由)                     
-│          IntentRuleEngine (规则) → LLM Router (兜底)         
-├────────┬──────────────┬──────────────┬─────────────────────
-│  Chat  │    ReAct     │Plan-Execute  │    Reflection        
-│ Agent  │  AgentLoop   │   Agent      │      Agent           
-├────────┴──────────────┴──────────────┴─────────────────────
-│                    ToolRegistry (工具注册)                    
-│             HttpTool  │  CalculatorTool  │  自定义Tool        
-├────────────────────────────────────────────────────────────
-│                    MemoryService (记忆服务)                   
-│        MemoryFileStore │ MemoryCompressor │ UserProfile      
-├────────────────────────────────────────────────────────────
-│                    ModelFacade (大模型调用)                                                               
-└────────────────────────────────────────────────────────────
-```
+
+### 分层说明
+
+- **接入层**：负责接收用户输入，当前包括 Web UI、REST API、SSE 流式接口、飞书 Webhook 和定时任务接口。
+- **编排层**：由 `ChatFlow` 统一处理 session、记忆注入、响应包装和渠道差异，是整个系统的主入口。
+- **路由层**：由 `ModeRouter` 和 `IntentRuleEngine` 共同决定采用哪种 Agent 模式执行任务。
+- **执行层**：真正执行业务推理，包含直接聊天、ReAct 循环、先规划后执行、自我反思、多专家协作等模式。
+- **能力层**：为执行层提供底层能力，包括模型调用、工具/技能调用、工作区管理和定时任务调度。
+- **持久化层**：当前以文件系统为主，存储长期记忆、定时任务、用户技能和专家协作工作区产物。
+
+### 核心调用链
+
+可以把 NanoClaw 理解为这样一条主链路：
+
+`MainController / FeishuChannel / CronJobController`
+→ `ChatFlow`
+→ `ModeRouter`
+→ `AgentFactory`
+→ `具体 Agent`
+→ `ModelFacade / ToolRegistry / SkillManager / WorkspaceManager / MemoryService`
+
+其中：
+
+- 定时任务会通过 `CronJobManager` 定期触发，并重新进入 `ChatFlow`
+- 多专家协作会通过 `ExpertPanelAgent` 组织多个角色执行，并由 `WorkspaceManager` 保存产出
+- 长期记忆由 `MemoryService` 与 `MemoryFileStore` 负责读写和压缩
 
 ## Agent 模式详解
 
@@ -376,74 +446,46 @@ nanoclaw.cronjob.base-dir=./data/cronjobs
 
 ## 项目结构
 
-```
+```text
 NanoClaw
 ├── src/main/java/com/nano/claw/
-│   ├── agent/                          # Agent 核心
-│   │   ├── common/                     # 通用数据模型
-│   │   │   ├── AgentRequest.java       # Agent 请求
-│   │   │   ├── AgentResponse.java      # Agent 响应
-│   │   │   ├── ChatRequest.java        # 聊天请求
-│   │   │   ├── ChatResponse.java       # 聊天响应
-│   │   │   └── ThinkStep.java          # 思考步骤
-│   │   ├── core/                       # Agent 核心实现
-│   │   │   ├── Agent.java              # Agent 抽象基类
-│   │   │   ├── AgentFactory.java       # Agent 工厂
-│   │   │   ├── AgentLoop.java          # ReAct 模式 Agent
-│   │   │   ├── ChatAgent.java          # Chat 模式 Agent
-│   │   │   ├── PlanExecuteAgent.java   # Plan-Execute 模式 Agent
-│   │   │   ├── ReflectionAgent.java    # Reflection 模式 Agent
-│   │   │   ├── IntentRuleEngine.java   # 意图规则引擎
-│   │   │   └── ModeRouter.java         # 模式路由器
-│   │   └── mcp/                        # 工具与技能
-│   │       ├── Tool.java               # 工具接口
-│   │       ├── ToolRegistry.java       # 工具注册中心
-│   │       ├── ToolResult.java         # 工具执行结果
-│   │       ├── Skill.java              # 技能接口
-│   │       ├── SkillRegistry.java      # 技能注册中心
-│   │       ├── CalculatorTool.java     # 计算器工具
-│   │       └── HttpTool.java           # HTTP 请求工具
-│   ├── channels/                       # IM 通道
-│   │   ├── Channel.java                # 通道接口
-│   │   ├── ChannelMessage.java         # 通道消息
-│   │   └── FeishuChannel.java          # 飞书通道
-│   ├── controller/                     # REST 控制器
-│   │   └── MainController.java         # 主控制器
-│   ├── cronjob/                        # 定时任务
-│   │   ├── CronJob.java                # 任务实体
-│   │   ├── CronJobController.java      # 任务 API
-│   │   ├── CronJobManager.java         # 任务管理器
-│   │   └── CronJobParser.java          # 自然语言解析
-│   ├── flow/                           # 编排层
-│   │   └── ChatFlow.java               # 聊天编排
-│   ├── llm/                            # 大模型调用
-│   │   ├── Model.java                  # 模型枚举
-│   │   ├── ModelFacade.java            # 模型调用门面
-│   │   ├── ModelRequest.java           # 模型请求
-│   │   └── ModelResponse.java          # 模型响应
-│   ├── memory/                         # 记忆系统
-│   │   ├── ConversationMemory.java     # 会话记忆
-│   │   ├── MemoryCompressor.java       # 记忆压缩
-│   │   ├── MemoryController.java       # 记忆 API
-│   │   ├── MemoryFileStore.java        # 文件存储
-│   │   ├── MemoryService.java          # 记忆服务
-│   │   └── UserProfile.java            # 用户画像
-│   ├── messages/                       # 消息模型
-│   │   └── Message.java
+│   ├── controller/                     # REST / SSE / Webhook 入口
+│   ├── flow/                           # ChatFlow 编排主链路
+│   ├── agent/
+│   │   ├── common/                     # ChatRequest / ChatResponse / ThinkStep 等公共模型
+│   │   ├── core/                       # Chat / ReAct / PlanExecute / Reflection / ExpertPanel 实现
+│   │   ├── expert/                     # 销售、产品、架构、开发、测试、项目经理等专家角色
+│   │   ├── panel/                      # 专家协作上下文、协作消息、工作流规划
+│   │   └── mcp/                        # Tool / Skill / Registry 实现
+│   ├── cronjob/                        # 自然语言定时任务、调度、持久化
+│   ├── memory/                         # 长期记忆、压缩、画像与 API
+│   ├── workspace/                      # 专家协作工作区、产物与报告管理
+│   ├── channels/                       # 飞书等 IM 通道
+│   ├── llm/                            # 模型枚举、请求响应、ModelFacade
 │   ├── sessions/                       # 会话管理
-│   │   └── SessionManager.java
-│   ├── utils/                          # 工具类
-│   │   └── HttpUtils.java
-│   └── NanoClawApplication.java        # 启动类
+│   ├── messages/                       # 底层消息模型
+│   ├── utils/                          # 通用工具类
+│   ├── heartbeat/                      # 独立的心跳/压测工具
+│   └── NanoClawApplication.java        # Spring Boot 启动类
 ├── src/main/resources/
-│   ├── static/
-│   │   ├── index.html                  # Web UI (暗色主题)
-│   │   └── skills/                     # 技能定义文件
-│   ├── templates/
-│   └── application.properties          # 配置文件
-├── data/memory/                        # 记忆存储目录
+│   ├── static/index.html               # Web UI（暗色主题）
+│   ├── static/skills/                  # 内置技能定义文件
+│   └── application.properties          # 应用配置
+├── data/
+│   ├── memory/                         # 长期记忆文件
+│   ├── cronjobs/                       # 定时任务持久化数据
+│   ├── workspaces/                     # 专家协作工作区与产出物
+│   └── skills/                         # 用户自定义技能
 └── pom.xml                             # Maven 配置
 ```
+
+如果你第一次阅读源码，建议按这个顺序看：
+
+1. `controller/MainController.java`
+2. `flow/ChatFlow.java`
+3. `agent/core/ModeRouter.java` 和 `AgentFactory.java`
+4. 你关心的具体 Agent（如 `AgentLoop.java`、`PlanExecuteAgent.java`、`ExpertPanelAgent.java`）
+5. `memory/`、`cronjob/`、`workspace/` 等横向能力模块
 
 ## 技术栈
 
